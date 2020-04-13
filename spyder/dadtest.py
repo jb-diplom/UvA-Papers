@@ -12,8 +12,8 @@ import json
 from collections import Counter
 import statistics
 
-#dataset="C:/Users/Janice/Documents/Big_Data_and_Content_Analysis/pornexercise/testdata2.json"
-dataset="C:/Users/Janice/Documents/Big_Data_and_Content_Analysis/pornexercise/xhamster.json"
+dataset="C:/Users/Janice/Documents/Big_Data_and_Content_Analysis/pornexercise/testdata2.json"
+#dataset="C:/Users/Janice/Documents/Big_Data_and_Content_Analysis/pornexercise/xhamster.json"
 
 with open(dataset, mode="r", encoding="utf-8") as fi:
     mydict = json.load(fi)
