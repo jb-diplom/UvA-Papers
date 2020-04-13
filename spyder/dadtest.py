@@ -14,7 +14,7 @@ import statistics
 
 dataset="C:/Users/Janice/Documents/Big_Data_and_Content_Analysis/pornexercise/testdata2.json"
 #dataset="C:/Users/Janice/Documents/Big_Data_and_Content_Analysis/pornexercise/xhamster.json"
-# add a comment for testing git
+# add a comment for testing git again
 
 with open(dataset, mode="r", encoding="utf-8") as fi:
     mydict = json.load(fi)
