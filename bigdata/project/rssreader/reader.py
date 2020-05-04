@@ -142,7 +142,7 @@ def collectArticles():
         allFeeds[feedURL]=feed
         feed.entries = enhanceEntries(feed.entries, feed.href, feedName)
         feed.entries = addEntries(feed.entries, allEntries)
-        if hasattr(feed.entries[1] , "content"):
+        if hasattr(feed, "entries") and hasattr(feed.entries[0] , "content"):
             print (feedName, "has Content")
     
     return savePickle(allEntries)
