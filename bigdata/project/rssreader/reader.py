@@ -181,19 +181,6 @@ def collectArticles():
 def summarizeItems(dict1):
     """
     
-
-    Parameters
-    ----------
-    dict1 : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    htm : TYPE
-        DESCRIPTION.
-
-    """
-    
     storyTitle=[]
     feedNames=[]
     contentType=[]
