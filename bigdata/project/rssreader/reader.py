@@ -20,6 +20,20 @@ import glob
 #%%
 
 def outputSummary(theDict):
+    """
+    Displays a simple Pandas table with the given dictionary
+
+    Parameters
+    ----------
+    theDict : dict
+        A dictionary with keys as the headings and lists as the contents
+        of the columns
+
+    Returns
+    -------
+    the Widget Hbox
+
+    """
     
     pd.set_option('display.max_rows', 40)
     pd.set_option('display.max_columns', 40)
@@ -44,6 +58,21 @@ def outputSummary(theDict):
 #%%
     
 def getHTMLParts(content, part):
+    """
+    Return a list of the specified parts of the given HTML content
+
+    Parameters
+    ----------
+    content : HTML string
+        HTML string.
+    part : string
+        name of HTML tag to search for e.g. 'a'
+
+    Returns
+    -------
+    allParts : list 
+        List of strings
+    """
     soup = BeautifulSoup(content, 'html.parser')
     allParts=soup.find_all(part)
     return allParts
@@ -161,12 +190,10 @@ def summarizeItems(dict1):
             contentType.append("Content")
             storyTitle.append(val.title)
             feedNames.append(val.feed_name)
-            # feedNames.append(val.source[8:])
         elif hasattr(val , "summary_detail"):
             contentType.append("Summary")
             storyTitle.append(val.title)
             feedNames.append(val.feed_name)
-            # feedNames.append(val.source[8:])
             
     # print(len(feedNames), len(storyTitle), len(contentType))
     outDict={"Source":feedNames, "Title":storyTitle, "Content":contentType}
@@ -183,10 +210,27 @@ def summarizeItems(dict1):
     return htm
 
 #%%
-    # Add Id of feed to each entry so that we only need the item, which then  
-    # contains all information that we need
 
 def enhanceEntries(entriesList, feedId, feedName):
+    """
+    Add Id of feed to each entry so that we only need the item, which then  
+    contains all information that we need
+
+    Parameters
+    ----------
+    entriesList : list
+        A List of RSSEntries (FeedParserDicts)
+    feedId : string
+        The URL of the source feed
+    feedName : string
+        The clear text name of the source
+
+    Returns
+    -------
+    entriesList : dict
+        The enhanced entriesList
+
+    """
     for entry in entriesList:
         entry["source"]=feedId
         entry["feed_name"]=feedName
@@ -212,7 +256,7 @@ def articleId(feedParserDict):
         return feedParserDict["link"]   # Just for the NY Times :-()
 
 #%%
-    # Load all picle files found in given relative directrory and 
+    # Load all pickle files found in given relative directrory and 
     # merge to one dictionary of unique items
 
 def loadAllFeedsFromFile(path = "./data" ):
@@ -226,7 +270,7 @@ def loadAllFeedsFromFile(path = "./data" ):
     summarizeItems(allDict)
     return allDict
     
-#%%
+#%% Test code for collecting and loading RSS Feed Data
     
 # collectArticles()
-loadAllFeedsFromFile()
+# loadAllFeedsFromFile()
