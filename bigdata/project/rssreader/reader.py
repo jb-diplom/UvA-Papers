@@ -144,7 +144,7 @@ def collectArticles():
     "Annals Hub" : "https://annalshub.com/feed/",
     "Z6 Mag" : "https://z6mag.com/feed/",
     "HGS Media Plus" : "https://hgsmediaplus.com.ng/feed/",
-    "Digital.Alive Worlkd": "https://digitalive.world/feed/",
+    # "Digital.Alive World": "https://digitalive.world/feed/",
     "The Next Hint": "https://www.thenexthint.com/feed/",
     "Africa Launch Pad" : "https://africalaunchpad.com/feed/",
     "International Security Journal" : "https://internationalsecurityjournal.com/feed/",
@@ -170,8 +170,8 @@ def collectArticles():
         feed = feedparser.parse(feedURL)
         allFeeds[feedURL]=feed
         feed.entries = enhanceEntries(feed.entries, feed.href, feedName)
-        feed.entries = addEntries(feed.entries, allEntries)
-        if hasattr(feed, "entries") and hasattr(feed.entries[0] , "content"):
+        addEntries(feed.entries, allEntries)
+        if hasattr(feed.entries[0] , "content"):
             print (feedName, "has Content")
     
     return savePickle(allEntries)
@@ -179,7 +179,7 @@ def collectArticles():
 #%%
 
 def summarizeItems(dict1):
-    """
+    
     
     storyTitle=[]
     feedNames=[]
@@ -244,7 +244,7 @@ def addEntries(entriesList, allEntries):
     for entry in entriesList:
         allEntries[articleId(entry)]=entry
         
-    return entriesList
+    return 
 
  
 #%%
@@ -260,10 +260,10 @@ def articleId(feedParserDict):
     # Load all pickle files found in given relative directrory and 
     # merge to one dictionary of unique items
 
-def loadAllFeedsFromFile(path = "./data" ):
+def loadAllFeedsFromFile(path = "../rssreader/data" ): #this is probably a stupid place for the data long term
     # os.chdir(path)
     allDict={}
-    for file in glob.glob("./data/*.pickle"):
+    for file in glob.glob(path + "/*.pickle"):
         print ("loading file: ", file)
         dict1=loadPickleArticles(file)
         allDict.update(dict1)       # Merge all loaded items
@@ -271,7 +271,29 @@ def loadAllFeedsFromFile(path = "./data" ):
     summarizeItems(allDict)
     return allDict
     
+#%%
+def getSampleDocs(num = 40):
+    allEntryDict=loadAllFeedsFromFile()
+    docs=[]
+    i=0 # use to break out at num
+    for key, val in allEntryDict.items():
+        html=""
+        if hasattr(val , "content"):
+            for line in val.content:
+                html = html + " " + line.value
+        elif hasattr(val , "summary_detail"):
+            html = val.summary_detail.value
+        else:
+            continue
+        i +=1
+        docs.append(val.title +" " + getStringContents(html))
+        if i > num :
+            break
+            
+    return docs 
+            
+            
 #%% Test code for collecting and loading RSS Feed Data
     
 # collectArticles()
-# loadAllFeedsFromFile()
+a=loadAllFeedsFromFile()
