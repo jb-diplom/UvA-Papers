@@ -19,7 +19,7 @@ from gensim.matutils import softcossim
 
 import gensim.downloader as api
 import warnings
-# Suppress annoying deprecation messages
+# Suppress annoying deprecation messages which I'm not going to fix yet
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import importlib
@@ -155,8 +155,8 @@ def softCosineSimilarityTest(numtestdocs=20):
     # Create a TF-IDF model. TF-IDF encoding represents words as their 
     # relative importance to the whole document in a collection of documents,
     # i.e. the sentences.
-    tf_idf = models.TfidfModel(sentences)
-    print("tf_idf:", tf_idf)
+    # tf_idf = models.TfidfModel(sentences)
+    # print("tf_idf:", tf_idf)
     
     # create 1xN vector filled with 1,2,..N    
     len_array = np.arange(len(sentences)) 
