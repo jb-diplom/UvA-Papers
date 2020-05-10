@@ -17,7 +17,7 @@ import pickle
 import glob
 from collections import Counter
 import re
-
+import time
 
 #%%
 
@@ -39,8 +39,8 @@ def outputSummary(theDict):
     
     pd.set_option('display.max_rows', 40)
     pd.set_option('display.max_columns', 40)
-    pd.set_option('display.width', None)
-    pd.set_option('display.max_colwidth', 80)
+    pd.set_option('display.width', 80)
+    pd.set_option('display.max_colwidth', 40)
     # sample data
     df1 = pd.DataFrame(theDict)
     
@@ -110,7 +110,7 @@ def loadPickleArticles(fileName):
 def collectArticles():
     
     # Primary source of feeds https://blog.feedspot.com/world_news_rss_feeds/
-    
+    # TODO put feed data in a separate configurable dictionary
     myfeeds= {
     "NY Times" : "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml",
     "Buzzfeed" : "https://www.buzzfeed.com/world.xml",
@@ -177,17 +177,30 @@ def collectArticles():
         addEntries(feed.entries, allEntries)
         toc = time.perf_counter()   # end timing
         if hasattr(feed.entries[0] , "content"):
-            print (f"{feedName}, has Content. \tLoaded in {toc - tic:0.4f} seconds")
+            print (f"{feedName: >30}Content Loaded in: {toc - tic:0.4f} seconds")
         else:
-            print (f"{feedName}, has Summary. \tLoaded in {toc - tic:0.4f} seconds")
+            print (f"{feedName: >30}Summary Loaded in: {toc - tic:0.4f} seconds")
                    
     return savePickle(allEntries)
  
 #%%
 
 def summarizeItems(dict1):
-    
-    
+    """
+    Takes dictionary of RSS Items per media outlet and returns a simple 
+    panda table of the contents
+
+    Parameters
+    ----------
+    dict1 : dict
+        DESCRIPTION key values of Feed Names and FeedParserDicts
+
+    Returns
+    -------
+    pa_table : Panda Table
+        DESCRIPTION. With three columns Source | Title | Content-Type
+
+    """
     storyTitle=[]
     feedNames=[]
     contentType=[]
@@ -205,7 +218,7 @@ def summarizeItems(dict1):
             
     # print(len(feedNames), len(storyTitle), len(contentType))
     outDict={"Source":feedNames, "Title":storyTitle, "Content":contentType}
-    outputSummary(outDict)    
+    pa_table=outputSummary(outDict)    
     
     # Example of HTML parsing
     # first = next(iter(dict1.values()))
@@ -215,7 +228,7 @@ def summarizeItems(dict1):
     # else:
     #     htm=first.summary_detail.value
         
-    return #htm
+    return pa_table
 
 #%%
 
@@ -275,7 +288,7 @@ def loadAllFeedsFromFile(path = "../rssreader/data" ): #this is probably a stupi
         dict1=loadPickleArticles(file)
         allDict.update(dict1)       # Merge all loaded items
 
-    summarizeItems(allDict)
+    # summarizeItems(allDict)
     return allDict
     
 #%%
@@ -387,4 +400,6 @@ def getAllTags(allDocDict, reload=False):
 #%% Test code for collecting and loading RSS Feed Data
     
 # collectArticles()
-# a=loadAllFeedsFromFile()
+# allDict=loadAllFeedsFromFile()
+# summarizeItems(allDict) # Output panda Table summarizing all articles
+    

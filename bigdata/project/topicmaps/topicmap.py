@@ -14,7 +14,6 @@ py.init_notebook_mode(connected=True)
 import plotly.graph_objs as go
 
 import importlib
-importlib.import_module("rssreader.reader")
 from rssreader.reader import getDocList
 
 # Other imports
@@ -56,6 +55,25 @@ def print_top_words(model, feature_names, n_top_words):
 #                                      stop_words='english',
 #                                      decode_error='ignore')
 # tf = tf_vectorizer.fit_transform(text)
+
+#%%
+def getCustomStopWords():
+    """
+    Add any expressions that need to be ignored in addition to the nltk.corpus
+    stoplist for english
+
+    Returns
+    -------
+    myStopWords : list
+
+    """
+    myStopWords = list(set(stopwords.words('english')))
+    myStopWords.extend(["view", "entire", "post", "twitter","com", "share","story",
+                        "interested", "friends","interested", "would", "also", "rt"
+                        "cipher", "brief", "continue", "reading", "onenewszetu",
+                        "offibiza", "linkthe", "haunting", "blogfor", "live"])
+    return myStopWords
+
 
 #%%
 def deriveTopicMaps(sentences, stopW=getCustomStopWords(), maxNum=30, ngram_range=(3,4)):
@@ -111,24 +129,6 @@ def testTopicMaps(stopW="english"):
     return zipped
 
 #%%
-def getCustomStopWords():
-    """
-    Add any expressions that need to be ignored in addition to the nltk.corpus
-    stoplist for english
-
-    Returns
-    -------
-    myStopWords : list
-
-    """
-    myStopWords = list(set(stopwords.words('english')))
-    myStopWords.extend(["view", "entire", "post", "twitter","com", "share","story",
-                        "interested", "friends","interested", "would", "also", "rt"
-                        "cipher", "brief", "continue", "reading", "onenewszetu",
-                        "offibiza", "linkthe", "haunting"])
-    return myStopWords
-
-#%%
 def getCustomStopPhrases():
     """
     Add any expressions that need to be ignored in addition to the nltk.corpus
@@ -147,59 +147,61 @@ def getCustomStopPhrases():
                         "story share", "think friends share", "NewsZetu", 
                         "rt.com", "Z6Mag", "onz6", "friends", "first onworld weekly news",
                         "first onworld weekly", "onworld weekly news", "offibiza",
-                        "latest news"]
+                        "latest news", "blogforum"]
     return myStopWords
 
 #%%
-def plotLeadingWords(topicList):
-    x, y = (list(x) for x in zip(*sorted(topicList, key=lambda x: x[1], reverse=True)))
-    # Now I want to extract out on the top 15 and bottom 15 words
-    Y = np.concatenate([y[0:15], y[-16:-1]])
-    X = np.concatenate([x[0:15], x[-16:-1]])
+# def plotLeadingWords(topicList):
+#     x, y = (list(x) for x in zip(*sorted(topicList, key=lambda x: x[1], reverse=True)))
+#     # Now I want to extract out on the top 15 and bottom 15 words
+#     Y = np.concatenate([y[0:15], y[-16:-1]])
+#     X = np.concatenate([x[0:15], x[-16:-1]])
     
-    # Plotting the Plot.ly plot for the Top 50 word frequencies
-    data = [go.Bar(
-                x = x[0:50],
-                y = y[0:50],
-                marker= dict(colorscale='Jet',
-                             color = y[0:50]
-                            ),
-                text='Word counts'
-        )]
+#     # Plotting the Plot.ly plot for the Top 50 word frequencies
+#     data = [go.Bar(
+#                 x = x[0:50],
+#                 y = y[0:50],
+#                 marker= dict(colorscale='Jet',
+#                              color = y[0:50]
+#                             ),
+#                 text='Word counts'
+#         )]
     
-    layout = go.Layout(
-        title='Top 50 Word frequencies after Preprocessing'
-    )
+#     layout = go.Layout(
+#         title='Top 50 Word frequencies after Preprocessing'
+#     )
     
-    fig = go.Figure(data=data, layout=layout)
+#     fig = go.Figure(data=data, layout=layout)
     
-    py.iplot(fig, filename='basic-bar')
+#     py.iplot(fig, filename='basic-bar')
     
-    # Plotting the Plot.ly plot for the Top 50 word frequencies
-    data = [go.Bar(
-                x = x[-100:],
-                y = y[-100:],
-                marker= dict(colorscale='Portland',
-                             color = y[-100:]
-                            ),
-                text='Word counts'
-        )]
+#     # Plotting the Plot.ly plot for the Top 50 word frequencies
+#     data = [go.Bar(
+#                 x = x[-100:],
+#                 y = y[-100:],
+#                 marker= dict(colorscale='Portland',
+#                              color = y[-100:]
+#                             ),
+#                 text='Word counts'
+#         )]
     
-    layout = go.Layout(
-        title='Bottom 100 Word frequencies after Preprocessing'
-    )
+#     layout = go.Layout(
+#         title='Bottom 100 Word frequencies after Preprocessing'
+#     )
     
-    fig = go.Figure(data=data, layout=layout)
+#     fig = go.Figure(data=data, layout=layout)
     
-    py.iplot(fig, filename='basic-bar')
-    return
+#     py.iplot(fig, filename='basic-bar')
+#     return
 #%%
 
 # allDict=loadAllFeedsFromFile()
-# docl=getDocList(allDict, limit=100, reloaddocs=False, stop_list=)
+# docl=getDocList(allDict, limit=100, reloaddocs=False)
+docl=getDocList(allDict, reloaddocs=False)
 # topics= deriveTopicMaps(docl)
     # Play with ngrams to find sensible topics
 # topics= deriveTopicMaps(docl,ngram_range=(1,2)) # Produces nonsense
 # topics= deriveTopicMaps(docl,ngram_range=(2,2)) # Produces recognisable topics but with many repetitions in different constellations
+topics= deriveTopicMaps(docl,ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
     
 # topics= deriveTopicMaps(docl,ngram_range=(4,4), maxNum=20) # with 4,4 you find completely differnt tabloid type stories (possibly they are all agency copy+paste stories?)
