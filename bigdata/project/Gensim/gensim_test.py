@@ -24,6 +24,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import importlib
 importlib.import_module("rssreader.reader")
+import time
+
 
 """
 NOTE:   the first call for "fasttext" includes a download of ca. 1GB of data, 
@@ -189,7 +191,6 @@ def format_vertical_headers(df):
     return (df.fillna('').style.set_table_styles(styles))
 
 #%%
-import time
 def testPerfOfsoftCosineSimilarity(numdocs=20):
     tic = time.perf_counter()
     mat=softCosineSimilarityTest(numdocs)

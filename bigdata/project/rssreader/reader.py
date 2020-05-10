@@ -15,6 +15,8 @@ import datetime
 from bs4 import BeautifulSoup
 import pickle
 import glob
+from collections import Counter
+import re
 
 
 #%%
@@ -37,8 +39,8 @@ def outputSummary(theDict):
     
     pd.set_option('display.max_rows', 40)
     pd.set_option('display.max_columns', 40)
-    # pd.set_option('display.width', None)
-    pd.set_option('display.max_colwidth', 40)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', 80)
     # sample data
     df1 = pd.DataFrame(theDict)
     
@@ -54,6 +56,7 @@ def outputSummary(theDict):
     
     # render hbox
     hbox
+    return hbox
 
 #%%
     
@@ -167,13 +170,17 @@ def collectArticles():
     allEntries={}    # The critical collection of all articles
     
     for feedName, feedURL in myfeeds.items():
+        tic = time.perf_counter()   # start timing
         feed = feedparser.parse(feedURL)
         allFeeds[feedURL]=feed
         feed.entries = enhanceEntries(feed.entries, feed.href, feedName)
         addEntries(feed.entries, allEntries)
+        toc = time.perf_counter()   # end timing
         if hasattr(feed.entries[0] , "content"):
-            print (feedName, "has Content")
-    
+            print (f"{feedName}, has Content. \tLoaded in {toc - tic:0.4f} seconds")
+        else:
+            print (f"{feedName}, has Summary. \tLoaded in {toc - tic:0.4f} seconds")
+                   
     return savePickle(allEntries)
  
 #%%
@@ -201,14 +208,14 @@ def summarizeItems(dict1):
     outputSummary(outDict)    
     
     # Example of HTML parsing
-    first = next(iter(dict1.values()))
+    # first = next(iter(dict1.values()))
     
-    if hasattr(first , "content"):
-        htm=first.content[0]["value"]
-    else:
-        htm=first.summary_detail.value
+    # if hasattr(first , "content"):
+    #     htm=first.content[0]["value"]
+    # else:
+    #     htm=first.summary_detail.value
         
-    return htm
+    return #htm
 
 #%%
 
@@ -291,9 +298,93 @@ def getSampleDocs(num = 40):
             break
             
     return docs 
+
+#%%
+def getDocList(allEntryDict=None, limit = None, reloaddocs= False, stop_list=None):
+    """
+    
+
+    Parameters
+    ----------
+    allEntryDict : dict, optional
+        DESCRIPTION. Dictionalry og RSS entries. The default is None.
+    limit : int, optional
+        DESCRIPTION. Max number of entries to return. The default is None.
+    reloaddocs : TYPE, optional
+        DESCRIPTION. The default is False.
+    stop_list : list, optional
+        DESCRIPTION. List of words or phrases which will be removed from all 
+        finished articles. Case insensitive removal. The default is None.
+
+    Returns
+    -------
+    docs : TYPE
+        DESCRIPTION.
+
+    """
+    
+    if reloaddocs or not allEntryDict:
+        allEntryDict=loadAllFeedsFromFile()
+        
+    docs=[]
+    i=0 # use to break out at limit
+    for key, val in allEntryDict.items():
+        html=""
+        if hasattr(val , "content"):
+            for line in val.content:
+                html = html + " " + line.value
+        elif hasattr(val , "summary_detail"):
+            html = val.summary_detail.value
+        else:
+            continue
+        i +=1
+        finalVal = val.title +" " + getStringContents(html)
+        if stop_list :   #substitute all phrases for '' case insensitive
+            for remove in stop_list: 
+                redata = re.compile(re.escape(remove), re.IGNORECASE)
+                finalVal = redata.sub('', finalVal)
+        docs.append(finalVal)
+        if limit and i > limit :
+            break
             
+    return docs 
+            
+#%%
+
+def getAllTags(allDocDict, reload=False):
+    
+    if reload :
+        allDocDict = loadAllFeedsFromFile()
+    
+    tags=[]
+    nwith=0
+    nwithout=0
+    for key, val in allDocDict.items():
+        if hasattr(val , "tags"):
+            nwith +=1
+            for tagItem in val["tags"]:
+                tags.append(tagItem["term"])
+        else:
+            nwithout +=1
+            
+    print("="*90,  "\nThere were", nwith, "items with tags and", nwithout, "without tags")
+    c_tags=Counter(tags)
+    print("="*90, "\nThese are the 10 most frequent tags used:\n","="*90,"\n",c_tags.most_common(20))
+
+# ========================================================================================== 
+# There were 1856 items with tags and 3912 without tags)
+# ========================================================================================== 
+# These are the 20 most frequent tags used:
+#  ========================================================================================== 
+#  [('News', 343), ('Coronavirus', 212), ('World News', 206), ('worldNews', 190), ('World', 145), 
+# ('World news', 120), ('Coronavirus outbreak', 119), ('Uncategorized', 112), ('Business', 91), 
+# ('Sports', 88), ('COVID-19', 87), ('Health', 81), ('National News', 78), ('Covid-19 Pandemic', 72), 
+# ('China', 71), ('Europe', 67), ('USA', 57), ('Society', 57), ('Baltic states', 57), ('US news', 54)]
+# len(set(tags)) --> 2797 unique tags
+
+    return tags
             
 #%% Test code for collecting and loading RSS Feed Data
     
 # collectArticles()
-a=loadAllFeedsFromFile()
+# a=loadAllFeedsFromFile()
