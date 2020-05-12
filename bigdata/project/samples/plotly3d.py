@@ -67,4 +67,5 @@ data = [trace]
 plot_figure = go.Figure(data=data, layout=layout)
 
 # Render the plot.
-plotly.offline.iplot(plot_figure)
+pl=plotly.offline.iplot(plot_figure)
+pl

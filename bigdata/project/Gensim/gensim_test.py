@@ -23,7 +23,10 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import importlib
-importlib.import_module("rssreader.reader")
+# importlib.import_module("rssreader.reader")
+importlib.import_module("reader")
+from reader import getSampleDocs,getDocList
+
 import time
 
 
@@ -43,6 +46,7 @@ NOTE:   the first call for "GloVe" includes a download of ca. 60MB of data,
 if 'w2v_model' not in dir():
     print ("Loading GloVe Embeddings. This may take some time")
     w2v_model = api.load("glove-wiki-gigaword-50")
+
 
 
 #%%
@@ -136,7 +140,6 @@ def getWordEmbeddingModel():
 
 def softCosineSimilarityTest(numtestdocs=20):
     # documents=getTestDocuments()
-    from rssreader.reader import getSampleDocs
     documents=getSampleDocs(numtestdocs)
     model=getWordEmbeddingModel()
     # Create gensim Dictionary of unique IDs of all words in all documents
@@ -180,6 +183,46 @@ def softCosineSimilarityTest(numtestdocs=20):
     return cossim_mat
 
 #%%
+#   https://www.machinelearningplus.com/nlp/cosine-similarity/
+
+def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
+    # documents=getTestDocuments()
+    docsZip=getDocList(allDict,limit,with_ids=True)
+    documents=[]
+    ids=[]
+    for i,j in docsZip:
+        documents.append(j)
+        ids.append(i)
+    model=getWordEmbeddingModel()
+    # Create gensim Dictionary of unique IDs of all words in all documents
+    dictionary = corpora.Dictionary([simple_preprocess(doc) for doc in documents])
+
+    # Prepare the similarity matrix
+    similarity_matrix = model.similarity_matrix(    dictionary, 
+                                                    tfidf=None, 
+                                                    threshold=0.0, 
+                                                    exponent=2.0, 
+                                                    nonzero_limit=100)
+    
+    # Convert the sentences into bag-of-words vectors.
+    sentences=[]
+    for doc in documents:
+        sentences.append(dictionary.doc2bow(simple_preprocess(doc)))
+        
+    # create 1xN vector filled with 1,2,..N    
+    len_array = np.arange(len(sentences)) 
+    # create NxN array filled with 1..N down, 1..N across
+    xx, yy = np.meshgrid(len_array, len_array)
+    # Iterate over the 2d matrix calculating
+    theMatrix=[[round(softcossim(sentences[i],sentences[j], similarity_matrix) ,2) 
+                for i, j in zip(x,y)] 
+                for y, x in zip(xx, yy)]
+    
+    cossim_mat = pd.DataFrame(theMatrix, index=ids, columns=ids)
+
+    return cossim_mat
+
+#%%
 def format_vertical_headers(df):
     """Display a dataframe with vertical column headers"""
     styles = [dict(selector="th", props=[('width', '40px')]),
@@ -201,6 +244,8 @@ def testPerfOfsoftCosineSimilarity(numdocs=20):
 
 #%%
 
+# Do one time only to get wordnet for Lemmatization
+
 # testPerfOfsoftCosineSimilarity(10)
 # soft_cosine_similarity_matrix(sentences)
 # similarity_matrix = fasttext_model300.similarity_matrix(dictionary, tfidf=None, threshold=0.0, exponent=2.0, nonzero_limit=100)
@@ -209,3 +254,4 @@ def testPerfOfsoftCosineSimilarity(numdocs=20):
 # testPerfOfsoftCosineSimilarity(1000)
 # testPerfOfsoftCosineSimilarity(2000)
 # testPerfOfsoftCosineSimilarity(3000)
+# matr=deriveSoftCosineSimilarityMatrix(allDict, 10)
