@@ -6,7 +6,8 @@ Created on Sun Apr 26 17:40:42 2020
 """
 
 
-#%%
+#%% Imports
+
 import feedparser 
 import ipywidgets as widgets
 from IPython import display
@@ -23,8 +24,10 @@ import re
 import time
 import seaborn as sns; sns.set()
 import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-#%%
+#%% outputSummary
 
 def outputSummary(theDict):
     """
@@ -63,7 +66,7 @@ def outputSummary(theDict):
     hbox
     return hbox
 
-#%%
+#%% getHTMLParts
     
 def getHTMLParts(content, part):
     """
@@ -84,7 +87,7 @@ def getHTMLParts(content, part):
     soup = BeautifulSoup(content, 'html.parser')
     allParts=soup.find_all(part)
     return allParts
-#%%
+#%% getStringContents
     
 def getStringContents(content):
     soup = BeautifulSoup(content, 'html.parser')
@@ -93,7 +96,8 @@ def getStringContents(content):
         fullStr = fullStr +str
     return fullStr
 
-#%%
+#%% savePickle
+
 def savePickle(dictOut):
     now=datetime.datetime.now()
     runtimeStr=now.strftime("%d%m%Y_%H%M%S")    # for saving datafiles uniquely
@@ -103,7 +107,7 @@ def savePickle(dictOut):
         
     return outfileName
 
-#%%
+#%% loadPickleArticles
 
 def loadPickleArticles(fileName):
     with open(fileName, 'rb') as infile:
@@ -116,7 +120,8 @@ def loadPickleArticles(fileName):
         dictIn.pop(key, None)
     return dictIn
 
-#%%
+#%% collectArticles
+
 def collectArticles():
     
     # Primary source of feeds https://blog.feedspot.com/world_news_rss_feeds/
@@ -178,8 +183,9 @@ def collectArticles():
     
     allFeeds={}
     # The critical collection of all articles
-    allDict=collections.defaultdict(lambda : None)
-    
+    # TODO tries=collections.defaultdict(lambda : None)
+    allEntries={}
+
     for feedName, feedURL in myfeeds.items():
         tic = time.perf_counter()   # start timing
         feed = feedparser.parse(feedURL)
@@ -187,15 +193,15 @@ def collectArticles():
         feed.entries = enhanceEntries(feed.entries, feed.href, feedName)
         addEntries(feed.entries, allEntries)
         toc = time.perf_counter()   # end timing
-        if hasattr(feed.entries[0] , "content"):
-            print (f"{feedName: >30}Content Loaded in: {toc - tic:0.4f} seconds")
-        else:
-            print (f"{feedName: >30}Summary Loaded in: {toc - tic:0.4f} seconds")
+        # if hasattr(feed , "entries") and hasattr(feed.entries[0] , "content"):
+        #     print (f"{feedName: >30}Content Loaded in: {toc - tic:0.4f} seconds")
+        # else:
+        print (f"{feedName: >30}Summary Loaded in: {toc - tic:0.4f} seconds")
                    
     collateDocContents(allEntries)
     return savePickle(allEntries)
  
-#%%
+#%% summarizeItems
 
 def summarizeItems(dict1):
     """
@@ -242,7 +248,8 @@ def summarizeItems(dict1):
         
     return pa_table
 
-#%%
+#%% summarizeByDate
+
 def summarizeByDate(dict1):
     """
     Takes dictionary of RSS Items per media outlet and returns a Seaborn 
@@ -293,7 +300,8 @@ def summarizeByDate(dict1):
     return swarm
 
 
-#%%
+#%% getNoPub
+
 def getNoPub(dict1):
     
     for uid, val  in dict1.items():
@@ -303,14 +311,14 @@ def getNoPub(dict1):
             break
     return outval
 
-#%%
+#%% dateOlderThan
 
 def dateOlderThan(date_from, num_days=0):
     start_of_project=parse("03 May 2020 00:00:00", ignoretz=True)
     time_between_insertion = start_of_project - date_from
 
     return time_between_insertion.days>num_days 
-#%%
+#%% enhanceEntries
 
 def enhanceEntries(entriesList, feedId, feedName):
     """
@@ -338,7 +346,7 @@ def enhanceEntries(entriesList, feedId, feedName):
         
     return entriesList
 
-#%%
+#%% addEntries
 
 def addEntries(entriesList, allEntries):
     for entry in entriesList:
@@ -347,7 +355,7 @@ def addEntries(entriesList, allEntries):
     return 
 
  
-#%%
+#%% articleId
 # return the unique Id of the given feed item in FeedParserDict form
         
 def articleId(feedParserDict):
@@ -356,13 +364,11 @@ def articleId(feedParserDict):
     else:
         return feedParserDict["link"]   # Just for the NY Times :-()
 
-#%%
+#%% loadAllFeedsFromFile
     # Load all pickle files found in given relative directrory and 
     # merge to one dictionary of unique items
 
 def loadAllFeedsFromFile(path = "../rssreader/data" ): #this is probably a stupid place for the data long term
-    # os.chdir(path)
-    # allDict=collections.defaultdict(lambda : None)
     allDict=collections.defaultdict(lambda : None)
     for file in glob.glob(path + "/*.pickle"):
         print ("loading file: ", file)
@@ -373,7 +379,7 @@ def loadAllFeedsFromFile(path = "../rssreader/data" ): #this is probably a stupi
     collateDocContents(allDict)
     return allDict
     
-#%%
+#%% getSampleDocs
 # TODO getSampleDocs should be removed everywhere - it's just a test function'
 # presumably replace with getDocList
 def getSampleDocs(num = 40):
@@ -396,11 +402,12 @@ def getSampleDocs(num = 40):
             
     return docs 
 
-#%%
+#%% collateDocContents
+
 def collateDocContents(allEntryDict, deleteBadEntries=True):
     """
     Content or summary_detail are extracted from the entry, cleaned from
-    HTML-tags and saved to item collatedContents in each entry
+    HTML-tags and saved to item with the key collatedContents in each entry.
     If deleteBadEntries is specified, then additionally all entries without 
     Content or summary_detail are removed from the supplied allEntryDict, as 
     are legacy articles older than the start of project (see: dateOlderThan 
@@ -433,19 +440,23 @@ def collateDocContents(allEntryDict, deleteBadEntries=True):
 
 #       Remove legacy articles    
         dt=None
-        if hasattr(val , "updated"):
-            dt=parse(val.updated, ignoretz=True)
-        else:
-            dt=parse(val.published, ignoretz=True)
-        if dateOlderThan(dt):
+        try:
+            if hasattr(val , "updated"):
+                    dt=parse(val.updated, ignoretz=True)
+            else:
+                dt=parse(val.published, ignoretz=True)
+            if dateOlderThan(dt):
+                toBeRemoved.append(key)  
+        except:
             toBeRemoved.append(key)  
-
+ 
     if deleteBadEntries:    # remove all old entries or those without contents
         for gone in toBeRemoved:    
             allEntryDict.pop(gone)   
          
     return  
-#%%
+#%% getDocList
+
 def getDocList(allEntryDict=None, limit = None, reloaddocs= False, 
                stop_list=None, with_ids=False):
     """
@@ -478,16 +489,7 @@ def getDocList(allEntryDict=None, limit = None, reloaddocs= False,
     ids=[]
     i=0 # use to break out at limit
     for key, val in allEntryDict.items():
-        # html=""
-        # if hasattr(val , "content"):
-        #     for line in val.content:
-        #         html = html + " " + line.value
-        # elif hasattr(val , "summary_detail"):
-        #     html = val.summary_detail.value
-        # else:
-        #     continue
         i +=1
-        # finalVal = val.title +" " + getStringContents(html)
         finalVal=val.collatedContents        
         if stop_list :   #substitute all phrases for ' ' case insensitive
             for remove in stop_list: 
@@ -500,7 +502,7 @@ def getDocList(allEntryDict=None, limit = None, reloaddocs= False,
         
     return zip(ids,docs) if with_ids  else docs
             
-#%%
+#%% getAllTags
 
 def getAllTags(allDocDict, reload=False):
     
@@ -541,5 +543,5 @@ def getAllTags(allDocDict, reload=False):
 # allDict=loadAllFeedsFromFile()
 # collateDocContents(allDict)
 # summarizeItems(allDict) # Output panda Table summarizing all articles
-# swarm=summarizeByDate(allDict)
+# swarm=summarizeByDate(allDict) # TODO do we need all the feeds shown on the swarm plot?
     

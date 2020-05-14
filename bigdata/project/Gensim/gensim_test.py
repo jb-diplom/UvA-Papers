@@ -198,6 +198,7 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
     dictionary = corpora.Dictionary([simple_preprocess(doc) for doc in documents])
 
     # Prepare the similarity matrix
+    # TODO Check if some of these parameters can be used to begin with rather than filtering later
     similarity_matrix = model.similarity_matrix(    dictionary, 
                                                     tfidf=None, 
                                                     threshold=0.0, 

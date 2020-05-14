@@ -32,7 +32,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Source: https://www.kaggle.com/arthurtok/spooky-nlp-and-topic-modelling-tutorial#3.-Topic-modelling
 
-#%%
+#%% LemmaCountVectorizer
 #Subclassing 
 lemm = WordNetLemmatizer()
 class LemmaCountVectorizer(TfidfVectorizer):
@@ -40,7 +40,8 @@ class LemmaCountVectorizer(TfidfVectorizer):
         analyzer = super(LemmaCountVectorizer, self).build_analyzer()
         return lambda doc: (lemm.lemmatize(w) for w in analyzer(doc))
     
-#%%
+#%% print_top_words
+
 def print_top_words(model, feature_names, n_top_words):
     for index, topic in enumerate(model.components_):
         message = "\nTopic #{}:".format(index)
@@ -58,7 +59,7 @@ def print_top_words(model, feature_names, n_top_words):
 #                                      decode_error='ignore')
 # tf = tf_vectorizer.fit_transform(text)
 
-#%%
+#%% getCustomStopWords
 def getCustomStopWords():
     """
     Add any expressions that need to be ignored in addition to the nltk.corpus
@@ -77,7 +78,7 @@ def getCustomStopWords():
     return myStopWords
 
 
-#%%
+#%% deriveTopicMaps
 def deriveTopicMaps(sentences, stopW=getCustomStopWords(), maxNum=30, ngram_range=(3,4)):
     """
     Using TfidfVectorizer with added Lemmatization, derive the given number
@@ -117,7 +118,7 @@ def deriveTopicMaps(sentences, stopW=getCustomStopWords(), maxNum=30, ngram_rang
     zipped = list(zip(feature_names, count_vec))
     return zipped
 
-#%%
+#%% testTopicMaps
 def testTopicMaps(stopW="english"):
     sentence = ["The stop_words_ attribute can get large and increase the model size when pickling. This attribute is provided only for introspection and can be safely removed using delattr or set to None before pickling.", 
             "I love to eat Fries"]
@@ -130,7 +131,7 @@ def testTopicMaps(stopW="english"):
     zipped = list(zip(feature_names, count_vec))
     return zipped
 
-#%%
+#%% getCustomStopPhrases
 def getCustomStopPhrases():
     """
     Add any expressions that need to be ignored in addition to the nltk.corpus
@@ -152,7 +153,7 @@ def getCustomStopPhrases():
                         "latest news", "blogforum"]
     return myStopWords
 
-#%%
+#%% testFuzzy
 def testFuzzy():
     str2Match = "apple inc"
     strOptions = ["Apple Inc.","apple park","apple incorporated","iphone"]
@@ -205,7 +206,7 @@ def testFuzzy():
     
 #     py.iplot(fig, filename='basic-bar')
 #     return
-#%%
+#%% unzipLeftSide
 def unzipLeftSide(iterable):
     return zip(*iterable).__next__()
 
@@ -216,7 +217,7 @@ def unzipLeftSide(iterable):
 # need to do deletions (if at all) after testFuzz and testSoftCosine have
 # been applied
 
-#%%
+#%% testFuzz
 
 def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
     """
@@ -243,7 +244,7 @@ def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
     
     topics=unzipLeftSide(topic_list) #just get the phrases)
     toBeRemoved=[]
-    if reloaddocs or not allEntryDict:
+    if not allEntryDict:
         allEntryDict=loadAllFeedsFromFile()
         
     i=0 # use to break out at limit
@@ -275,7 +276,7 @@ def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
         allEntryDict.pop(gone)        
     return toBeRemoved
     
-#%%
+#%% Test Code for Topic Maps and Fuzzy
 
 allDict=loadAllFeedsFromFile()
 # docl=getDocList(allDict, limit=1000, reloaddocs=False)
@@ -286,5 +287,5 @@ docl=getDocList(allDict, reloaddocs=False)
 # topics= deriveTopicMaps(docl,ngram_range=(2,2)) # Produces recognisable topics but with many repetitions in different constellations
 topics= deriveTopicMaps(docl,ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
 testFuzz(topics,allDict, limit=10)
-len(testFuzz(topics,allDict, limit=1000, threshold=70))
+len(testFuzz(topics,allDict, limit=None, threshold=70))
 # topics= deriveTopicMaps(docl,ngram_range=(4,4), maxNum=20) # with 4,4 you find completely differnt tabloid type stories (possibly they are all agency copy+paste stories?)
