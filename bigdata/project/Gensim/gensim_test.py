@@ -4,8 +4,7 @@ Created on Sat May  2 19:05:27 2020
 
 @author: Janice
 """
-#%%
-
+#%% imports
 
 from gensim import models, corpora
 from gensim.utils import simple_preprocess
@@ -18,6 +17,11 @@ from IPython import display
 from gensim.matutils import softcossim 
 
 import gensim.downloader as api
+
+import pyLDAvis
+import pyLDAvis.gensim
+from bokeh.io import  show, output_notebook, output_file
+
 import warnings
 # Suppress annoying deprecation messages which I'm not going to fix yet
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -28,7 +32,6 @@ importlib.import_module("reader")
 from reader import getSampleDocs,getDocList
 
 import time
-
 
 """
 NOTE:   the first call for "fasttext" includes a download of ca. 1GB of data, 
@@ -49,7 +52,7 @@ if 'w2v_model' not in dir():
 
 
 
-#%%
+#%% tfidfTest TODO probably delet since it's a test method
 def tfidfTest():
 
     
@@ -77,7 +80,7 @@ def tfidfTest():
     for doc in tfidf[corpus]:
         print([[mydict[id], np.around(freq, decimals=2)] for id, freq in doc])
         
-#%%
+#%% getTestDocuments
 def getTestDocuments():
         # Define the documents
         doc_trump = "Mr. Trump became president after winning the political election. Though he lost the support of some republican friends, Trump is friends with President Putin"
@@ -89,7 +92,7 @@ def getTestDocuments():
         documents = [doc_trump, doc_election, doc_putin, doc_soup, doc_noodles, doc_dosa]
         return documents
     
-#%%
+#%% renderTable
 def renderTable(df1):
         # create output widgets
     widget1 = widgets.Output()
@@ -104,7 +107,7 @@ def renderTable(df1):
     # render hbox
     hbox
 
-#%%
+#%% cosineSimilarityTest
 def cosineSimilarityTest():
 
     documents = getTestDocuments()
@@ -129,13 +132,13 @@ def cosineSimilarityTest():
     """
     return df
 
-#%%
+#%% getWordEmbeddingModel
 def getWordEmbeddingModel():
     # Download or load the WordEmbedding models
         
     return w2v_model
 
-#%%
+#%% softCosineSimilarityTest
 #   https://www.machinelearningplus.com/nlp/cosine-similarity/
 
 def softCosineSimilarityTest(numtestdocs=20):
@@ -162,7 +165,7 @@ def softCosineSimilarityTest(numtestdocs=20):
     # i.e. the sentences.
     # tf_idf = models.TfidfModel(sentences)
     # print("tf_idf:", tf_idf)
-    
+
     # create 1xN vector filled with 1,2,..N    
     len_array = np.arange(len(sentences)) 
     # create NxN array filled with 1..N down, 1..N across
@@ -182,7 +185,7 @@ def softCosineSimilarityTest(numtestdocs=20):
 
     return cossim_mat
 
-#%%
+#%% deriveSoftCosineSimilarityMatrix
 #   https://www.machinelearningplus.com/nlp/cosine-similarity/
 
 def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
@@ -195,6 +198,7 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
         ids.append(i)
     model=getWordEmbeddingModel()
     # Create gensim Dictionary of unique IDs of all words in all documents
+    # pyDAVis param "d"
     dictionary = corpora.Dictionary([simple_preprocess(doc) for doc in documents])
 
     # Prepare the similarity matrix
@@ -206,11 +210,17 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
                                                     nonzero_limit=100)
     
     # Convert the sentences into bag-of-words vectors.
-    sentences=[]
+    sentences=[]     # pyDAVis param "c"
     for doc in documents:
         sentences.append(dictionary.doc2bow(simple_preprocess(doc)))
-        
-    # create 1xN vector filled with 1,2,..N    
+
+    # Create a TF-IDF model. TF-IDF encoding represents words as their 
+    # relative importance to the whole document in a collection of documents,
+    # i.e. the sentences.
+    # pyDAVis param "lda"
+    tf_idf = models.TfidfModel(sentences)
+
+    # create 1xN vector filled with 1,2,..N
     len_array = np.arange(len(sentences)) 
     # create NxN array filled with 1..N down, 1..N across
     xx, yy = np.meshgrid(len_array, len_array)
@@ -223,7 +233,65 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
 
     return cossim_mat
 
-#%%
+#%% preparePyLDAvisData
+#   https://www.machinelearningplus.com/nlp/cosine-similarity/
+
+def preparePyLDAvisData(allDict, limit=None, numTopics=30):
+
+    docsZip=getDocList(allDict,limit,with_ids=True)
+    documents=[]
+    ids=[]
+    for i,j in docsZip:
+        documents.append(j)
+        ids.append(i)
+    model=getWordEmbeddingModel()
+    # Create gensim Dictionary of unique IDs of all words in all documents
+    # pyDAVis param "d"
+    dictionary = corpora.Dictionary([simple_preprocess(doc) for doc in documents])
+
+    # Prepare the similarity matrix
+    # TODO Check if some of these parameters can be used to begin with rather than filtering later
+    similarity_matrix = model.similarity_matrix(    dictionary, 
+                                                    tfidf=None, 
+                                                    threshold=0.0, 
+                                                    exponent=2.0, 
+                                                    nonzero_limit=100)
+    
+    # Convert the sentences into bag-of-words vectors.
+    sentences=[]     # pyDAVis param "c"
+    for doc in documents:
+        sentences.append(dictionary.doc2bow(simple_preprocess(doc)))
+
+    ldamodel = models.ldamodel.LdaModel(sentences, num_topics=numTopics, id2word = dictionary, passes=50)
+
+    # # create 1xN vector filled with 1,2,..N
+    # len_array = np.arange(len(sentences)) 
+    # # create NxN array filled with 1..N down, 1..N across
+    # xx, yy = np.meshgrid(len_array, len_array)
+    # # Iterate over the 2d matrix calculating
+    # theMatrix=[[round(softcossim(sentences[i],sentences[j], similarity_matrix) ,2) 
+    #             for i, j in zip(x,y)] 
+    #             for y, x in zip(xx, yy)]
+    
+    # cossim_mat = pd.DataFrame(theMatrix, index=ids, columns=ids)
+
+    return (ldamodel, sentences, dictionary)
+
+#%% showPyLDAvis
+
+def showPyLDAvis(allDict, notebook=True, numTopics=30):
+    if not notebook:
+        output_file("pyDAVis.html")
+    dataTuple=preparePyLDAvisData(allDict, limit=None, numTopics=numTopics)
+    data = pyLDAvis.gensim.prepare(dataTuple[0],dataTuple[1],dataTuple[2])
+    if notebook:
+        p=pyLDAvis.display(data)
+    else:
+        p=pyLDAvis.show(data) # displays in own window combined with output_file
+    show(p)
+    return
+
+#%% format_vertical_headers
 def format_vertical_headers(df):
     """Display a dataframe with vertical column headers"""
     styles = [dict(selector="th", props=[('width', '40px')]),
@@ -234,7 +302,7 @@ def format_vertical_headers(df):
                           ('vertical-align', 'top')])]
     return (df.fillna('').style.set_table_styles(styles))
 
-#%%
+#%% testPerfOfsoftCosineSimilarity
 def testPerfOfsoftCosineSimilarity(numdocs=20):
     tic = time.perf_counter()
     mat=softCosineSimilarityTest(numdocs)
@@ -256,3 +324,5 @@ def testPerfOfsoftCosineSimilarity(numdocs=20):
 # testPerfOfsoftCosineSimilarity(2000)
 # testPerfOfsoftCosineSimilarity(3000)
 # matr=deriveSoftCosineSimilarityMatrix(allDict, 10)
+# showPyLDAvis(allDict, False)
+# showPyLDAvis(smallDict(allDict,10), False, 30)

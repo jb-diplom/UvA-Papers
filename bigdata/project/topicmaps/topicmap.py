@@ -4,6 +4,7 @@ Created on Sat May  9 14:44:18 2020
 
 @author: Janice
 """
+#%% imports
 
 from nltk.stem import WordNetLemmatizer
 import numpy as np
@@ -12,6 +13,9 @@ import numpy as np
 import plotly.offline as py
 py.init_notebook_mode(connected=True)
 
+import importlib
+# importlib.import_module("rssreader.reader")
+importlib.import_module("reader")
 from reader import getDocList,loadAllFeedsFromFile,getStringContents
 
 # Other imports
@@ -81,7 +85,8 @@ def getCustomStopWords():
 #%% deriveTopicMaps
 def deriveTopicMaps(sentences, stopW=getCustomStopWords(), maxNum=30, ngram_range=(3,4)):
     """
-    Using TfidfVectorizer with added Lemmatization, derive the given number
+    Using 
+    with added Lemmatization, derive the given number
     of "Topics" from the supplied sentences.
     The implicit use of TfidfTransformer additionally scales down the impact 
     of tokens that occur very frequently in the given corpus and that are hence 
@@ -153,16 +158,7 @@ def getCustomStopPhrases():
                         "latest news", "blogforum"]
     return myStopWords
 
-#%% testFuzzy
-def testFuzzy():
-    str2Match = "apple inc"
-    strOptions = ["Apple Inc.","apple park","apple incorporated","iphone"]
-    Ratios = process.extract(str2Match,strOptions)
-    print(Ratios)
-    # You can also select the string with the highest matching percentage
-    highest = process.extractOne(str2Match,strOptions)
-    print(highest)
-    return
+
 #%%
 # def plotLeadingWords(topicList):
 #     x, y = (list(x) for x in zip(*sorted(topicList, key=lambda x: x[1], reverse=True)))
@@ -210,8 +206,8 @@ def testFuzzy():
 def unzipLeftSide(iterable):
     return zip(*iterable).__next__()
 
-#%%
-# TODO Do same thing for CosineSimilarities (but multiply them by 10)
+#%% TODO Do same thing for CosineSimilarities
+# TODO Do same thing for CosineSimilarities (but multiply them by 100)
 # remake the matrix with the full Ids of the Documents, then write them back 
 # to the allEntryDict
 # need to do deletions (if at all) after testFuzz and testSoftCosine have
@@ -269,23 +265,62 @@ def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
         if len(goodTops) > 0:
             val["topiclist"]=goodTops
         else:
+            val["topiclist"]=None
             toBeRemoved.append(key)
         if limit and i > limit :
             break
-    for gone in toBeRemoved:
-        allEntryDict.pop(gone)        
+    # for gone in toBeRemoved:
+    #     allEntryDict.pop(gone)        
     return toBeRemoved
-    
+
+#%% populateTopicMatrix
+
+def populateTopicMatrix(allDocDict, feedTopicMatrix):
+    """
+    Calculate from allDocDict how many of the specified topics occur for each 
+    FeedItem of the named feeds in feedTopicMatrix, summing them in the 
+    x.y position (Feed, Tagname) in the given matrix
+
+    Parameters
+    ----------
+    allDocDict : TYPE
+        DESCRIPTION.
+    feedTopicMatrix : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+        
+    topics=[]
+    for key, val in allDocDict.items():
+        if hasattr(val , "topiclist") and val.topiclist:
+            for topicItem in val.topiclist:
+                 topic = topicItem[0]
+                 if topic in feedTopicMatrix.columns and val.feed_name in feedTopicMatrix.index:
+                     feedTopicMatrix[topic][val.feed_name] +=1
+    return
+#%%
+
+def doStandardInitialize():
+    allDict=loadAllFeedsFromFile()
+    docl=getDocList(allDict, reloaddocs=False)
+    topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
+    testFuzz(topics,allDict, limit=None, threshold=70)
+    return
+
 #%% Test Code for Topic Maps and Fuzzy
 
-allDict=loadAllFeedsFromFile()
-# docl=getDocList(allDict, limit=1000, reloaddocs=False)
-docl=getDocList(allDict, reloaddocs=False)
-# topics= deriveTopicMaps(docl)
-    # Play with ngrams to find sensible topics
-# topics= deriveTopicMaps(docl,ngram_range=(1,2)) # Produces nonsense
-# topics= deriveTopicMaps(docl,ngram_range=(2,2)) # Produces recognisable topics but with many repetitions in different constellations
-topics= deriveTopicMaps(docl,ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
-testFuzz(topics,allDict, limit=10)
-len(testFuzz(topics,allDict, limit=None, threshold=70))
-# topics= deriveTopicMaps(docl,ngram_range=(4,4), maxNum=20) # with 4,4 you find completely differnt tabloid type stories (possibly they are all agency copy+paste stories?)
+# allDict=loadAllFeedsFromFile()
+# # docl=getDocList(allDict, limit=1000, reloaddocs=False)
+# docl=getDocList(allDict, reloaddocs=False)
+# # topics= deriveTopicMaps(docl)
+#     # Play with ngrams to find sensible topics
+# # topics= deriveTopicMaps(docl,ngram_range=(1,2)) # Produces nonsense
+# # topics= deriveTopicMaps(docl,ngram_range=(2,2)) # Produces recognisable topics but with many repetitions in different constellations
+# topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
+# # testFuzz(topics,allDict, limit=10)
+# len(testFuzz(topics,allDict, limit=None, threshold=70))
+# # topics= deriveTopicMaps(docl,ngram_range=(4,4), maxNum=20) # with 4,4 you find completely differnt tabloid type stories (possibly they are all agency copy+paste stories?)

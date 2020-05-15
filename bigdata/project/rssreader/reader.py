@@ -12,6 +12,9 @@ import feedparser
 import ipywidgets as widgets
 from IPython import display
 import pandas as pd
+import seaborn as sns; sns.set()
+import matplotlib.pyplot as plt
+import numpy as np
 import datetime
 from datetime import timedelta
 from dateutil.parser import *
@@ -24,8 +27,14 @@ import re
 import time
 import seaborn as sns; sns.set()
 import matplotlib.pyplot as plt
+from collections import Counter, defaultdict
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+import importlib
+# importlib.import_module("rssreader.reader")
+# importlib.import_module("topicmap")
+# from topicmap import populateTopicMatrix
 
 #%% outputSummary
 
@@ -101,7 +110,7 @@ def getStringContents(content):
 def savePickle(dictOut):
     now=datetime.datetime.now()
     runtimeStr=now.strftime("%d%m%Y_%H%M%S")    # for saving datafiles uniquely
-    outfileName="./data/feed" + runtimeStr + ".pickle"
+    outfileName="../rssreader/data/feed" + runtimeStr + ".pickle"
     with open(outfileName, 'wb') as outfile:
         pickle.dump(dictOut, outfile, pickle.HIGHEST_PROTOCOL)
         
@@ -197,7 +206,9 @@ def collectArticles():
         #     print (f"{feedName: >30}Content Loaded in: {toc - tic:0.4f} seconds")
         # else:
         print (f"{feedName: >30}Summary Loaded in: {toc - tic:0.4f} seconds")
-                   
+
+    # populates collatedContents and removes any RSS-Entries with no contents
+    # or summary detail
     collateDocContents(allEntries)
     return savePickle(allEntries)
  
@@ -536,12 +547,107 @@ def getAllTags(allDocDict, reload=False):
 # len(set(tags)) --> 2797 unique tags
 
     return tags
+#%%
+
+def getAllFeedTopics(allDocDict):
+    """
+    Collect the number of topics per feed from given dictionary
+
+    Parameters
+    ----------
+    allDocDict : TYPE
+        DESCRIPTION.
+    reload : TYPE, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    None.
+
+    """
+
+    feedTopicdict=defaultdict(lambda: 0)
+    feedTopicnamesdict=defaultdict(lambda: set())
+    # Listitem= allDocDict[0]
+    for key, val in allDocDict.items():
+        if hasattr(val , "topiclist") and val.topiclist:
+            feedTopicdict[val["feed_name"]] += len(val["topiclist"])
+            for TopicItem in val["topiclist"]:
+                feedTopicnamesdict[val["feed_name"]].add(TopicItem[0])
+
+    for key,val in feedTopicnamesdict.items():
+        feedTopicnamesdict[key]=list(val)
+        
+    return (feedTopicdict,feedTopicnamesdict)
+#%%
+def makeTopicMatrix(df):
+        
+    allTopics=[]
+    allFeeds=[]
+    num=[]
+    for fd in df.index:
+        for topItem in df.columns:
+            if df[topItem][fd] > 0:
+                allFeeds.append(fd) 
+                allTopics.append(topItem)
+                num.append(df[topItem][fd])
+                     
+    df = pd.DataFrame({"Feeds": allFeeds, "Topics" : allTopics, "Number": num})
+    return df
+ 
+#%% getAllTopics
+
+def getAllTopics(allDocDict):
+    
+    topics=[]
+    nwith=0
+    nwithout=0
+    for key, val in allDocDict.items():
+        if hasattr(val , "topiclist") and val.topiclist:
+            nwith +=1
+            for topicItem in val["topiclist"]:
+                topics.append(topicItem[0])
+        else:
+            nwithout +=1
             
+    print("="*90,  "\nThere were", nwith, "items with topics and", nwithout, "without topics")
+    c_topics=Counter(topics)
+    print("="*90, "\nThese are the 10 most frequent topics used:\n","="*90,"\n",c_topics.most_common(20))
+
+    return topics
+#%%
+def displayTopicsAndFeeds(allItemDict):
+    sns.set()
+    # plt.xticks(rotation=60)
+    plt.xticks(rotation=45, horizontalalignment='right')
+    feedTuple=getAllFeedTopics(allItemDict)
+    
+    feeds=[]
+    allTopics=getAllTopics(allItemDict)
+    c_Topics=Counter(allTopics)
+    top30=c_Topics.most_common(30)
+    Topicnames=[item[0] for item in top30]
+    for feed,nrTopics in feedTuple[0].items():
+        feeds.append(feed)
+    
+    matr=np.zeros( (len(feeds),len(Topicnames) ) )
+    df = pd.DataFrame(data= matr, columns=Topicnames, index=feeds)
+    populateTopicMatrix(allItemDict, df)
+    df2=makeTopicMatrix(df)
+    sns.set_context("paper", font_scale=1.0)
+    # sns.set_style("whitegrid", {'axes.grid' : False})
+    cmap = sns.cubehelix_palette (dark = .3, light=.8, as_cmap=True)
+    ax = sns.scatterplot(data=df2,x="Feeds", y="Topics", size="Number", 
+                         hue="Number",sizes=(30,300), markers = False) 
+    ax.tick_params(labelsize=5)
+    plt.title("Topic Usage in RSS Feeds")
+    plt.show()
+    return ax
 #%% Test code for collecting and loading RSS Feed Data
     
-# collectArticles()
+collectArticles()
 # allDict=loadAllFeedsFromFile()
-# collateDocContents(allDict)
 # summarizeItems(allDict) # Output panda Table summarizing all articles
 # swarm=summarizeByDate(allDict) # TODO do we need all the feeds shown on the swarm plot?
     
+# displayTopicsAndFeeds(allDict)
