@@ -19,6 +19,8 @@ Created on Wed May  6 23:11:37 2020
 import ipywidgets as widgets
 import numpy as np
 import ipyvolume as ipv
+from bokeh.models import ColumnDataSource, HoverTool
+from bokeh.plotting import figure
 
 
 x, y, z, u, v, w = np.random.random((6, 1000))*2-1
@@ -42,8 +44,10 @@ VBox([ipv.gcc(), size, size_selected, color, color_selected])
 import plotly
 import plotly.graph_objs as go
 
+# output_file("myfile.html")
+
 # Configure Plotly to be rendered inline in the notebook.
-plotly.offline.init_notebook_mode()
+# plotly.offline.init_notebook_mode()
 
 # Configure the trace.
 trace = go.Scatter3d(
@@ -69,3 +73,4 @@ plot_figure = go.Figure(data=data, layout=layout)
 # Render the plot.
 pl=plotly.offline.iplot(plot_figure)
 pl
+plotly.offline.plot(plot_figure, filename='file.html')

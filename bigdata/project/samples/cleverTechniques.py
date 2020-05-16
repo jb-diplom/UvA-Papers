@@ -50,7 +50,8 @@ def testFuzzy():
     return
 
 #%% smallDict utility
-def smallDict(d, sample=10):
+def smallDict(d, sample=50):
+    import random
     keys = random.sample(list(d), sample)
     values = [d[k] for k in keys]
     return dict(zip(keys, values))

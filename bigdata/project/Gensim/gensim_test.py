@@ -29,7 +29,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import importlib
 # importlib.import_module("rssreader.reader")
 importlib.import_module("reader")
-from reader import getSampleDocs,getDocList
+from reader import getSampleDocs
+importlib.import_module("topicmap")
+from topicmap import getDocList, getCustomStopWords
 
 import time
 
@@ -143,7 +145,7 @@ def getWordEmbeddingModel():
 
 def softCosineSimilarityTest(numtestdocs=20):
     # documents=getTestDocuments()
-    documents=getSampleDocs(numtestdocs)
+    documents=getSampleDocs(numtestdocs) # TODO replace with getDocList
     model=getWordEmbeddingModel()
     # Create gensim Dictionary of unique IDs of all words in all documents
     dictionary = corpora.Dictionary([simple_preprocess(doc) for doc in documents])
@@ -238,7 +240,7 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
 
 def preparePyLDAvisData(allDict, limit=None, numTopics=30):
 
-    docsZip=getDocList(allDict,limit,with_ids=True)
+    docsZip=getDocList(allDict,limit,stop_list=getCustomStopWords(), with_ids=True)
     documents=[]
     ids=[]
     for i,j in docsZip:

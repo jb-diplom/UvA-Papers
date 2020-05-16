@@ -4,17 +4,17 @@ Created on Wed May  6 21:31:08 2020
 
 @author: Janice
 """
-
-
 import seaborn as sns; sns.set()
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from collections import Counter, defaultdict 
-import matplotlib.ticker as ticker
 
 import importlib
-from reader import loadAllFeedsFromFile, getAllTags
+# importlib.import_module("rssreader.reader")
+importlib.import_module("reader")
+from reader import getDocList,loadAllFeedsFromFile,getStringContents, getAllTags
+from topicmap import smallDict, getAllTopics, deriveTopicMaps,testFuzz
 # tips = sns.load_dataset("tips")
 # ax = sns.scatterplot(x="total_bill", y="tip", data=tips)
 
@@ -24,8 +24,9 @@ from reader import loadAllFeedsFromFile, getAllTags
 # ax = sns.scatterplot(x="total_bill", y="tip",
 #                       hue="day", style="time", data=tips)
 import seaborn as sns
-#%%
 sns.set()
+#%%
+
 
 # # Load the example planets dataset
 # planets = sns.load_dataset("planets") 
@@ -37,9 +38,8 @@ sns.set()
 #                       data=planets)
 
 
-#%%
+#%% displayTopics
 # https://www.drawingfromdata.com/how-to-rotate-axis-labels-in-seaborn-and-matplotlib (sizing)
-
 
 def displayTopics(topics):
     sns.set(style="whitegrid")
@@ -106,7 +106,7 @@ def getAuthors(inDict):
     print("With author:",nwith, "Without author:", nwithout)
     return authors
                 
-#%%                
+#%% displayAuthors
 def displayAuthors(theAuthors):
     sns.set(style="whitegrid")
     
@@ -137,14 +137,11 @@ def displayAuthors(theAuthors):
     ax.legend(ncol=2, loc="lower right", frameon=True)
     ax.set(xlim=(0, max(frequen)+5), xlabel="",
             ylabel="Authors of all articles")
-    plt.yticks(rotation=15, horizontalalignment='right')
+    plt.yticks(rotation=0, horizontalalignment='right')
     pltout=sns.despine(left=True, bottom=True)
     return pltout
 
-#%%
-# df=displayAuthors(getAuthors(allDict))
-
-#%%
+#%% getAllFeedtags
 
 def getAllFeedtags(allDocDict):
     """
@@ -177,8 +174,7 @@ def getAllFeedtags(allDocDict):
         
     return (feedtagdict,feedtagnamesdict)
 
-#%%
-    
+#%% populateTagMatrix
 
 def populateTagMatrix(allDocDict, feedTagMatrix):
     """
@@ -208,7 +204,7 @@ def populateTagMatrix(allDocDict, feedTagMatrix):
                      feedTagMatrix[tag][val.feed_name] +=1
     return
 
-#%%
+#%% makeTagMatrix
 def makeTagMatrix(df):
         
     allTags=[]
@@ -225,7 +221,7 @@ def makeTagMatrix(df):
     return df
  
 
-#%%
+#%% displayTags
 def displayTags(allItemDict):
     sns.set()
     # plt.xticks(rotation=60)
@@ -253,6 +249,38 @@ def displayTags(allItemDict):
     plt.title("Tag Usage in RSS Feeds")
     plt.show()
     return ax
+
+#%% testDisplayTopics Histogram
+def testDisplayTopics(numArticles=300, numTopics=30, dict=None):
+    if not dict:
+        dict=loadAllFeedsFromFile()
+    small=smallDict(dict,numArticles)
+    docl=getDocList(small, reloaddocs=False, stop_list=getCustomStopWords())
+    # docl=getDocList(small, reloaddocs=False)
+    topics= deriveTopicMaps(docl, maxNum=numTopics, ngram_range=(3,3))
+    testFuzz(topics, small, limit=30)
+    displayTopics(topics)
+    return
+
+#%% testDisplayAuthors Histogram
+def testDisplayAuthors(numArticles=300, dict=None):
+    if not dict:
+        dict=loadAllFeedsFromFile()
+    small=smallDict(dict,numArticles)
+    displayAuthors(getAuthors(small))
+    return
+
+#%% testDisplayTags Scatterplot
+def testDisplayTags(numArticles=300, dict=None):
+    if not dict:
+        dict=loadAllFeedsFromFile()
+    small=smallDict(dict,numArticles)
+    displayTags(small)
+    return
+
 #%%
 allDict1=loadAllFeedsFromFile()
-displayTags(allDict1)
+small=smallDict(allDict1,300)
+testDisplayTopics(dict=small)
+testDisplayAuthors(dict=small)
+testDisplayTags(dict=small)
