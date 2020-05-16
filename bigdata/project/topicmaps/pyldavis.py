@@ -10,6 +10,8 @@ Created on Mon May 11 17:29:30 2020
 import json
 import numpy as np
 import pyLDAvis
+# TODO for readme 
+# conda install -c conda-forge pyldavis
 from bokeh.io import  show, output_notebook, output_file
 
 
