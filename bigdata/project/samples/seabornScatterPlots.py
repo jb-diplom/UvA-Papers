@@ -14,7 +14,8 @@ import importlib
 # importlib.import_module("rssreader.reader")
 importlib.import_module("reader")
 from reader import loadAllFeedsFromFile,getStringContents, getAllTags
-from topicmap import getDocList, smallDict, getAllTopics, deriveTopicMaps,testFuzz
+importlib.import_module("topicmap")
+from topicmap import getDocList, smallDict, getAllTopics, deriveTopicMaps,testFuzz, getCustomStopWords
 # tips = sns.load_dataset("tips")
 # ax = sns.scatterplot(x="total_bill", y="tip", data=tips)
 

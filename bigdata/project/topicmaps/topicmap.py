@@ -41,7 +41,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-# Do one time only to get wordnet for Lemmatization
+# TODO something for the readme.txt Do one time only to get wordnet for Lemmatization
 # import nltk
 # nltk.download() # --> and choose Corpora/wordnet
 

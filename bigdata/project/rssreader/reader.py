@@ -302,7 +302,13 @@ def summarizeByDate(dict1):
     outDict={"Source":feedNames, "Article Size (words)":articleSize, "Date":articleDate}
     df = pd.DataFrame(outDict)
     df = df.sort_values('Date',ascending=True).reset_index()
-    swarm=sns.catplot(x="Date", y="Article Size (words)", hue="Source", kind="swarm", data=df);
+    # strip =sns.stripplot (data=df, x="Date", y ="Article Size (words)", hue="Source", jitter = 0.25,  orient = "h" )
+    swarm=sns.violinplot(x="Date", y="Article Size (words)", hue="Source", data=df, vert=False, width=40, height=12, aspect= 20)
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', fontsize= "xx-small",ncol=2)
+    #swarm=sns.catplot(x="Date", y="Article Size (words)", hue="Source", orient = "h", kind="swarm", data=df, height=4, aspect= 1.5);
+   
+    #sns.set_yticklabels(sns.get_yticklabels(), fontsize=7)
+    # swarm=sns.catplot(x="Date", y="Article Size (words)", hue="Source", kind="swarm", data=df);
     plt.xticks(rotation = 45, horizontalalignment="right" )
     # swarm=sns.violinplot(x="Date", y="ArticleSize", data=df);
 
