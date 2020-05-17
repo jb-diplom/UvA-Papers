@@ -17,10 +17,13 @@ from IPython import display
 from gensim.matutils import softcossim 
 
 import gensim.downloader as api
+from dateutil.parser import *
 
 import pyLDAvis
 import pyLDAvis.gensim
 from bokeh.io import  show, output_notebook, output_file
+
+import matplotlib.pyplot as plt
 
 import warnings
 # Suppress annoying deprecation messages which I'm not going to fix yet
@@ -34,6 +37,7 @@ importlib.import_module("topicmap")
 from topicmap import getDocList, getCustomStopWords
 
 import time
+
 
 """
 NOTE:   the first call for "fasttext" includes a download of ca. 1GB of data, 
@@ -54,7 +58,7 @@ if 'w2v_model' not in dir():
 
 
 
-#%% tfidfTest TODO probably delet since it's a test method
+#%% tfidfTest TODO probably delete since it's a test method
 def tfidfTest():
 
     
@@ -82,7 +86,7 @@ def tfidfTest():
     for doc in tfidf[corpus]:
         print([[mydict[id], np.around(freq, decimals=2)] for id, freq in doc])
         
-#%% getTestDocuments
+#%% getTestDocuments TODO Delete
 def getTestDocuments():
         # Define the documents
         doc_trump = "Mr. Trump became president after winning the political election. Though he lost the support of some republican friends, Trump is friends with President Putin"
@@ -109,7 +113,7 @@ def renderTable(df1):
     # render hbox
     hbox
 
-#%% cosineSimilarityTest
+#%% cosineSimilarityTest TODO delete
 def cosineSimilarityTest():
 
     documents = getTestDocuments()
@@ -134,7 +138,7 @@ def cosineSimilarityTest():
     """
     return df
 
-#%% getWordEmbeddingModel
+#%% getWordEmbeddingModel TODO try out other word embedding (fasttext_model300)
 def getWordEmbeddingModel():
     # Download or load the WordEmbedding models
         
@@ -192,7 +196,8 @@ def softCosineSimilarityTest(numtestdocs=20):
 
 def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
     # documents=getTestDocuments()
-    docsZip=getDocList(allDict,limit,with_ids=True)
+    docsZip=getDocList(allDict,limit,stop_list=getCustomStopWords(), with_ids=True)
+
     documents=[]
     ids=[]
     for i,j in docsZip:
@@ -205,6 +210,7 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
 
     # Prepare the similarity matrix
     # TODO Check if some of these parameters can be used to begin with rather than filtering later
+    # TODO Shouldn't the tf_idf from below be put into this call?
     similarity_matrix = model.similarity_matrix(    dictionary, 
                                                     tfidf=None, 
                                                     threshold=0.0, 
@@ -234,6 +240,184 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
     cossim_mat = pd.DataFrame(theMatrix, index=ids, columns=ids)
 
     return cossim_mat
+
+#%% Data Reduction and plotting
+# TODO do TruncateSVD and/or TSNE (see James Baker )
+# See D:/Janice/github/Capstone/jlbCapstoneClustering.py graphVectorSpace
+def calculateXYZByPCAMethod(df, clusterNumber=20, threshold=0.5):
+
+    try:   # remove any previous calculated values
+        df.drop(columns=['pca-one', 'pca-two','pca-three'])
+        df.drop(columns=['specGroup'])
+    except:
+        print("No columns to drop")
+
+    df2=df.copy()
+    #set all values below threshold to 0
+    df2=df2.applymap(lambda x: np.nan if x < threshold or x ==1 else x)
+    # compress down to relevant value only 
+    df2.index.dropna(how='all')     # dropb nan rows
+    empty_cols = [col for col in df2.columns if df2[col].isnull().all()]
+    # Drop these columns from the dataframe
+    df2.drop(empty_cols,
+            axis=1,
+            inplace=True)
+    new_df=df2.applymap(lambda x: 0 if pd.isnull(x) else x) # replace nans with 0
+
+    from sklearn.cluster import SpectralClustering
+    sc=SpectralClustering(clusterNumber).fit_predict(new_df)
+
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=3)
+    pca_result = pca.fit_transform(new_df)
+
+# Add the resulting coords as additional columns onto the dataframe
+    new_df['pca-one'] = pca_result[:,0]
+    new_df['pca-two'] = pca_result[:,1]
+    new_df['pca-three'] = pca_result[:,2]
+
+# Add the spectral analysis as additional column onto the dataframe
+    new_df['specGroup'] = sc
+# TODO add publication date for optionally colouring according to date
+# TODO add feedname date for optionally colouring according to feedname
+# TODO add article sizedate for optionally sizing balls according to article size
+
+    return new_df
+
+def show3D(df):
+
+    from mpl_toolkits.mplot3d import Axes3D
+    ax = plt.figure(figsize=(16,10)).gca(projection='3d')
+    ax.scatter(
+        xs=df.loc[:]["pca-one"],
+        ys=df.loc[:]["pca-two"],
+        zs=df.loc[:]["pca-three"],
+        c=df.loc[:]["specGroup"],
+        cmap='tab10'
+    )
+    ax.set_xlabel('pca-one')
+    ax.set_ylabel('pca-two')
+    ax.set_zlabel('pca-three')
+
+    # hover=plt.select(dict(type=HoverTool))
+    # ax.legend.click_policy="hide"
+    # hover.tooltips={"id": "@index", "publication": "@pca-one", "content":"@pca-two", "category":"@specGroup"}
+
+    plt.show()
+    return
+
+def plotScatter3D(df, title, allDict):
+    import plotly
+    import plotly.graph_objs as go
+    statTooltips=[]
+    for key in df.index:
+        statTooltips.append(tooltipText(allDict[key]))
+
+    trace = go.Scatter3d(
+        x=df['pca-one'],
+        y=df['pca-two'],
+        z=df['pca-three'],
+        mode='markers',
+        marker=dict(
+            size=0,
+            color=df["specGroup"],
+            colorscale='Jet',
+            showscale=True,
+            opacity=0.5
+        ),
+        text=statTooltips,
+        hoverinfo='text',
+    )
+    # Configure the layout.
+    layout = go.Layout(margin={'l': 0, 'r': 0, 'b': 0, 't': 0})
+    
+    data = [trace]
+    plot_figure = go.Figure(data=data, layout=layout)
+    
+    # Render the plot.
+    pl=plotly.offline.iplot(plot_figure)
+    pl
+    plotly.offline.plot(plot_figure, filename='file.html')
+    return trace
+
+#%% tooltipText
+def tooltipText(rssEntry):
+    """
+    Pseudo HTML string for displaying the RSS-entry infos, currently 
+    title, feedname, date of publication and author
+
+    Parameters
+    ----------
+    rssEntry : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    str : TYPE
+        DESCRIPTION.
+
+    """
+    src = rssEntry["feed_name"]
+    auth = getAuthorFromRssEntry(rssEntry)
+    if hasattr(rssEntry , "updated"):
+        dt=parse(rssEntry.updated, ignoretz=True)
+    else:
+        dt=parse(rssEntry.published, ignoretz=True)
+    title = rssEntry.title
+
+    datestr=dt.strftime("%d/%m/%Y, %H:%M:%S")
+    items=[]
+    items.append(f"Title:           {title : <10}")
+    items.append(f"Feed:         {src: <10}")
+    items.append(f"Published: {datestr: <10}")
+    items.append(f"Author:       {auth : <10}")
+
+    str=""
+    for token in items:
+        str=str+(token)+("<br>")
+
+    return str
+
+#%% Authors over all Articles
+def getAuthorFromRssEntry(val):
+    """
+    Get the author(s) string for the given RSS-entry
+    Parameters
+    ----------
+    val : dict and RSS-entry
+        DESCRIPTION.
+    Returns
+    -------
+    str just the name or names of the authors or empty string if none
+        DESCRIPTION.
+
+    """
+    authors=[]
+    nwith=0
+    nwithout=0
+    try:
+        # if hasattr(val , "authors"):
+        #     authors.extend([n['name'] for n in val.authors])
+        if hasattr(val , "author"):
+            if ',' in val.author:
+                authors.extend(val.author.split (",") for val in authors)
+            elif ' and ' in val.author:
+                authors.extend(val.author.split (" and "))
+            else:
+                authors.append(val.author)
+            nwith +=1
+        else:
+            nwithout +=1
+    except:
+        nwithout +=1
+
+    for ix, auth in enumerate(authors):
+        if ' and ' in auth:
+            authors.extend(auth.split (" and "))
+     # for auth in authors:
+     #     if (len(auth))
+
+    return " ".join(authors)
 
 #%% preparePyLDAvisData
 #   https://www.machinelearningplus.com/nlp/cosine-similarity/
@@ -311,9 +495,24 @@ def testPerfOfsoftCosineSimilarity(numdocs=20):
     toc = time.perf_counter()
     print(f"Cosine Similarity for {numdocs} docs performed in {toc - tic:0.4f} seconds")
     mat.to_csv('outdata/' + str(numdocs) + 'x' + str(numdocs) + '.csv', sep='\t')
+    return mat
 
 
-#%%
+#%% Test 3d Plotting od cosine similarity matrix
+def test3DPlotOfCosineSimilarity(allDict, num=None):
+
+    matrix=deriveSoftCosineSimilarityMatrix(allDict, num)
+    matout=calculateXYZByPCAMethod(matrix,8,0.69)
+    plotScatter3D(matout,"10 Groups, threshold 0.69", allDict)
+
+    # can also do a simple perspective plot with matplot
+    show3D(matout)
+
+    # In case you need to clean up a previously used and abused matrix ..
+    # newmatr=newmatr_svae.drop(columns=['pca-one', 'pca-two','pca-three','specGroup'])
+
+    return
+#%% Test run methods
 
 # Do one time only to get wordnet for Lemmatization
 
@@ -328,3 +527,4 @@ def testPerfOfsoftCosineSimilarity(numdocs=20):
 # matr=deriveSoftCosineSimilarityMatrix(allDict, 10)
 # showPyLDAvis(allDict, False)
 # showPyLDAvis(smallDict(allDict,10), False, 30)
+# test3DPlotOfCosineSimilarity(allDict, 500)

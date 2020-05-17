@@ -80,3 +80,11 @@ output_file("myfile.html")
            title="Hover Tooltip Formatting", sizing_mode="scale_width")
     """
 show(p)
+
+# using DataFrames
+
+df.index # gets the index column of a DataFrame
+df.index[0] # gets the value of the first index
+
+# Add a column
+df['pca-three'] = pca_result[:,2] # in this case the second column of the 

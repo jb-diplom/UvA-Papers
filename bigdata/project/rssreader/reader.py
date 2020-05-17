@@ -498,7 +498,7 @@ def getAllTags(allDocDict, reload=False):
 # ========================================================================================== 
 # These are the 20 most frequent tags used:
 #  ========================================================================================== 
-#  [('News', 343), ('Coronavirus', 212), ('World News', 206), ('worldNews', 190), ('World', 145), 
+#  [('News', 343), ('Coronavirus', 212), ('World News', 206), ('worldNews', 190), ('World', 145),
 # ('World news', 120), ('Coronavirus outbreak', 119), ('Uncategorized', 112), ('Business', 91), 
 # ('Sports', 88), ('COVID-19', 87), ('Health', 81), ('National News', 78), ('Covid-19 Pandemic', 72), 
 # ('China', 71), ('Europe', 67), ('USA', 57), ('Society', 57), ('Baltic states', 57), ('US news', 54)]

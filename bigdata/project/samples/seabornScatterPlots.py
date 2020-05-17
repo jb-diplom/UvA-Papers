@@ -106,7 +106,7 @@ def getAuthors(inDict):
      #     if (len(auth))
     print("With author:",nwith, "Without author:", nwithout)
     return authors
-                
+
 #%% displayAuthors
 def displayAuthors(theAuthors):
     sns.set(style="whitegrid")
