@@ -6,6 +6,7 @@ Created on Sat May  2 19:05:27 2020
 """
 #%% imports
 
+import math
 from gensim import models, corpora
 from gensim.utils import simple_preprocess
 import numpy as np
@@ -14,7 +15,12 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import ipywidgets as widgets
 from IPython import display
-from gensim.matutils import softcossim 
+from IPython.core.display import HTML
+from gensim.matutils import softcossim
+import datetime
+import time
+import pickle
+import glob
 
 import gensim.downloader as api
 from dateutil.parser import *
@@ -24,80 +30,60 @@ import pyLDAvis.gensim
 from bokeh.io import  show, output_notebook, output_file
 
 import matplotlib.pyplot as plt
+import plotly.express as px
 
 import warnings
 # Suppress annoying deprecation messages which I'm not going to fix yet
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+# warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore")
 
 import importlib
 # importlib.import_module("rssreader.reader")
 importlib.import_module("reader")
-from reader import getSampleDocs
+from reader import loadAllFeedsFromFile,loadPickleArticles
 importlib.import_module("topicmap")
-from topicmap import getDocList, getCustomStopWords
+from topicmap import getDocList, getCustomStopWords, deriveTopicMaps, updateDictionaryByFuzzyRelevanceofTopics
 
-import time
+# import globals
+#%% loadWordEmbeddings
+global fasttext_model300   # Defined as global variable due to very long loading times
+global w2v_model           # Defined as global variable due to very long loading times
+# fasttext_model300=False
+# w2v_model=False
+# glove-wiki-gigaword-300
 
+def loadWordEmbeddings(modelName="w2v_model"):
+    """
+    Loads the named word embedding model (used in soft CosineSimilarity test)
+    NOTE1:  the first call for "fasttext" includes a download of ca. 1GB of data, 
+            which takes ca. 30 minutes, subsequent calls load this from disk 
+            which also takes 2-3 minutes
+    NOTE2:  the first call for "GloVe (w2v_model)" includes a download of ca. 
+            60MB of data, which takes ca. 3 minutes, subsequent calls load this 
+            from disk which also takes 30 seconds. Only load if not already bound            
+    Parameters
+    ----------
+    modelName : TYPE, optional
+        DESCRIPTION. The word embedding model to load. The default is "w2v_model".
+        Other supported model is fasttext_model300
 
-"""
-NOTE:   the first call for "fasttext" includes a download of ca. 1GB of data, 
-        which takes ca. 30 minutes, subsequent calls load this from disk 
-        which also takes 2-3 minutes
-"""
-# if 'fasttext_model300' not in dir():
-#     print ("Loading Fasttext Embeddings. This will take a very long time")
-#     fasttext_model300 = api.load('fasttext-wiki-news-subwords-300')
-"""
-NOTE:   the first call for "GloVe" includes a download of ca. 60MB of data, 
-        which takes ca. 3 minutes, subsequent calls load this from disk 
-        which also takes 30 seconds. Only load if not already bound
-"""
-if 'w2v_model' not in dir():
-    print ("Loading GloVe Embeddings. This may take some time")
-    w2v_model = api.load("glove-wiki-gigaword-50")
+    Returns
+    -------
+    None. The loaded model ist stored in the global variables fasttext_model300 
+    or w2v_model
+    """
+    global w2v_model
+    global fasttext_model300
+    if modelName == "w2v_model" and 'w2v_model' not in dir():
+        print ("Loading GloVe Embeddings. This may take some time")
+        w2v_model = api.load("glove-wiki-gigaword-50")
+    elif modelName == "fasttext_model300" and 'fasttext_model300' not in dir():
+        print ("Loading Fasttext Embeddings. This will take a very long time")
+        fasttext_model300 = api.load('fasttext-wiki-news-subwords-300')
+    else:
+        print (modelName, "is unknown")
+    return
 
-
-
-#%% tfidfTest TODO probably delete since it's a test method
-def tfidfTest():
-
-    
-    documents = ["This is the first line",
-                 "This is the second sentence",
-                 "This third document"]
-    
-    # Create the Dictionary and Corpus
-    mydict = corpora.Dictionary([simple_preprocess(line) for line in documents])
-    corpus = [mydict.doc2bow(simple_preprocess(line)) for line in documents]
-    
-    # Show the Word Weights in Corpus
-    for doc in corpus:
-        print([[mydict[id], freq] for id, freq in doc])
-    
-    # [['first', 1], ['is', 1], ['line', 1], ['the', 1], ['this', 1]]
-    # [['is', 1], ['the', 1], ['this', 1], ['second', 1], ['sentence', 1]]
-    # [['this', 1], ['document', 1], ['third', 1]]
-    
-    # Create the TF-IDF model
-        
-    tfidf = models.TfidfModel(corpus, smartirs='ntc')
-    
-    # Show the TF-IDF weights
-    for doc in tfidf[corpus]:
-        print([[mydict[id], np.around(freq, decimals=2)] for id, freq in doc])
-        
-#%% getTestDocuments TODO Delete
-def getTestDocuments():
-        # Define the documents
-        doc_trump = "Mr. Trump became president after winning the political election. Though he lost the support of some republican friends, Trump is friends with President Putin"
-        doc_election = "President Trump says Putin had no political interference is the election outcome. He says it was a witchhunt by political parties. He claimed President Putin is a friend who had nothing to do with the election"
-        doc_putin = "Post elections, Vladimir Putin became President of Russia. President Putin had served as the Prime Minister earlier in his political career"
-        doc_soup = "Soup is a primarily liquid food, generally served warm or hot (but may be cool or cold), that is made by combining ingredients of meat or vegetables with stock, juice, water, or another liquid. "
-        doc_noodles = "Noodles are a staple food in many cultures. They are made from unleavened dough which is stretched, extruded, or rolled flat and cut into one of a variety of shapes."
-        doc_dosa = "Dosa is a type of pancake from the Indian subcontinent, made from a fermented batter. It is somewhat similar to a crepe in appearance. Its main ingredients are rice and black gram."
-        documents = [doc_trump, doc_election, doc_putin, doc_soup, doc_noodles, doc_dosa]
-        return documents
-    
 #%% renderTable
 def renderTable(df1):
         # create output widgets
@@ -113,43 +99,19 @@ def renderTable(df1):
     # render hbox
     hbox
 
-#%% cosineSimilarityTest TODO delete
-def cosineSimilarityTest():
-
-    documents = getTestDocuments()
-    # Create the Document Term Matrix
-    count_vectorizer = CountVectorizer(stop_words='english')
-    count_vectorizer = CountVectorizer()
-    sparse_matrix = count_vectorizer.fit_transform(documents)
-    
-    # OPTIONAL: Convert Sparse Matrix to Pandas Dataframe if you want to see the word frequencies.
-    doc_term_matrix = sparse_matrix.todense()
-    df = pd.DataFrame(doc_term_matrix, 
-                      columns=count_vectorizer.get_feature_names(), 
-                      index=['doc_trump', 'doc_election', 'doc_putin'])
-    print(cosine_similarity(df, df))
-    """
-    [[1.         0.51480485 0.38890873]
-     [0.51480485 1.         0.38829014]
-     [0.38890873 0.38829014 1.        ]]
-    
-    Interpretation: 
-    doc_trump is more similar to doc_election (0.51) than to doc_putin (0.39)
-    """
-    return df
-
 #%% getWordEmbeddingModel TODO try out other word embedding (fasttext_model300)
 def getWordEmbeddingModel():
     # Download or load the WordEmbedding models
-        
-    return w2v_model
+    # loadWordEmbeddings("w2v_model")
+    return api.load("glove-wiki-gigaword-50")
 
 #%% softCosineSimilarityTest
 #   https://www.machinelearningplus.com/nlp/cosine-similarity/
 
 def softCosineSimilarityTest(numtestdocs=20):
     # documents=getTestDocuments()
-    documents=getSampleDocs(numtestdocs) # TODO replace with getDocList
+    # documents=getSampleDocs(numtestdocs)
+    documents=getDocList(limit=numtestdocs)
     model=getWordEmbeddingModel()
     # Create gensim Dictionary of unique IDs of all words in all documents
     dictionary = corpora.Dictionary([simple_preprocess(doc) for doc in documents])
@@ -241,22 +203,42 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
 
     return cossim_mat
 
+#%% savePickle
+
+def saveDFPickle(df):
+    now=datetime.datetime.now()
+    runtimeStr=now.strftime("%d%m%Y_%H%M%S")    # for saving datafiles uniquely
+    outfileName="Gensim/runtime_data/softcosmatrix" + runtimeStr + ".pickle"
+    with open(outfileName, 'wb') as outfile:
+        pickle.dump(df, outfile, pickle.HIGHEST_PROTOCOL)
+        
+    return outfileName
+
+def loadMatrixFile(path = "../runtime_data" ):
+    matrices=[]
+    for file in glob.glob(path + "/*.pickle"):
+        print ("loading file: ", file)
+        matrix=loadPickleArticles(file)
+        matrices.append(matrix)
+    return matrices
+
 #%% Data Reduction and plotting
 # TODO do TruncateSVD and/or TSNE (see James Baker )
 # See D:/Janice/github/Capstone/jlbCapstoneClustering.py graphVectorSpace
 def calculateXYZByPCAMethod(df, clusterNumber=20, threshold=0.5):
-
-    try:   # remove any previous calculated values
-        df.drop(columns=['pca-one', 'pca-two','pca-three'])
-        df.drop(columns=['specGroup'])
-    except:
-        print("No columns to drop")
-
-    df2=df.copy()
+    """ 
+    - copy given matrix
+    - remove all rows/columns where all values are below given 
+    - apply spectral analysis for colouring --> colour
+    - apply PCA dimension reduction --> x,y,z
+    - add x,y,z and colour and return matrix
+    threshold 
+    """
+    df2=df.copy(deep=True)
     #set all values below threshold to 0
     df2=df2.applymap(lambda x: np.nan if x < threshold or x ==1 else x)
     # compress down to relevant value only 
-    df2.index.dropna(how='all')     # dropb nan rows
+    df2=df2.dropna(how='all')     # dropb nan rows
     empty_cols = [col for col in df2.columns if df2[col].isnull().all()]
     # Drop these columns from the dataframe
     df2.drop(empty_cols,
@@ -266,6 +248,11 @@ def calculateXYZByPCAMethod(df, clusterNumber=20, threshold=0.5):
 
     from sklearn.cluster import SpectralClustering
     sc=SpectralClustering(clusterNumber).fit_predict(new_df)
+
+    # determine largest topicality per entry for size of ball in scatterplot
+    sizes=[]
+    for flt_size in new_df.max(axis=1):
+        sizes.append(math.ceil((flt_size-(threshold*0.9))*80))
 
     from sklearn.decomposition import PCA
     pca = PCA(n_components=3)
@@ -278,13 +265,14 @@ def calculateXYZByPCAMethod(df, clusterNumber=20, threshold=0.5):
 
 # Add the spectral analysis as additional column onto the dataframe
     new_df['specGroup'] = sc
+    new_df['size'] = sizes
 # TODO add publication date for optionally colouring according to date
 # TODO add feedname date for optionally colouring according to feedname
 # TODO add article sizedate for optionally sizing balls according to article size
 
     return new_df
 
-def show3D(df):
+def show3D(df, title=""):
 
     from mpl_toolkits.mplot3d import Axes3D
     ax = plt.figure(figsize=(16,10)).gca(projection='3d')
@@ -302,16 +290,21 @@ def show3D(df):
     # hover=plt.select(dict(type=HoverTool))
     # ax.legend.click_policy="hide"
     # hover.tooltips={"id": "@index", "publication": "@pca-one", "content":"@pca-two", "category":"@specGroup"}
+    plt.title(title, fontsize=20)
+    plt.tight_layout()
 
     plt.show()
     return
 
-def plotScatter3D(df, title, allDict):
+def plotScatter3D(df, title, allDict, notebook=True):
     import plotly
     import plotly.graph_objs as go
     statTooltips=[]
     for key in df.index:
-        statTooltips.append(tooltipText(allDict[key]))
+        try:
+            statTooltips.append(tooltipText(allDict[key]))
+        except:
+            print (key, "not found")
 
     trace = go.Scatter3d(
         x=df['pca-one'],
@@ -319,11 +312,12 @@ def plotScatter3D(df, title, allDict):
         z=df['pca-three'],
         mode='markers',
         marker=dict(
-            size=0,
+            size=df["size"],
             color=df["specGroup"],
-            colorscale='Jet',
+            colorscale='Viridis',
+            # symbol=df["specGroup"], # TODO actually want Feedname
             showscale=True,
-            opacity=0.5
+            opacity=0.6
         ),
         text=statTooltips,
         hoverinfo='text',
@@ -333,11 +327,15 @@ def plotScatter3D(df, title, allDict):
     
     data = [trace]
     plot_figure = go.Figure(data=data, layout=layout)
-    
+    # plot_figure.update_layout(title:title)
+    # plt.title(title, fontsize=16)
+    # plt.tight_layout()
+
     # Render the plot.
     pl=plotly.offline.iplot(plot_figure)
     pl
-    plotly.offline.plot(plot_figure, filename='file.html')
+    if not notebook:
+        plotly.offline.plot(plot_figure, filename='file.html')
     return trace
 
 #%% tooltipText
@@ -466,15 +464,18 @@ def preparePyLDAvisData(allDict, limit=None, numTopics=30):
 #%% showPyLDAvis
 
 def showPyLDAvis(allDict, notebook=True, numTopics=30):
+    # TODO: see if we can get ngrams into pyLDAvis
     if not notebook:
         output_file("pyDAVis.html")
+    else:
+        pyLDAvis.enable_notebook()
     dataTuple=preparePyLDAvisData(allDict, limit=None, numTopics=numTopics)
     data = pyLDAvis.gensim.prepare(dataTuple[0],dataTuple[1],dataTuple[2])
     if notebook:
         p=pyLDAvis.display(data)
     else:
         p=pyLDAvis.show(data) # displays in own window combined with output_file
-    show(p)
+        show(p)
     return
 
 #%% format_vertical_headers
@@ -499,19 +500,41 @@ def testPerfOfsoftCosineSimilarity(numdocs=20):
 
 
 #%% Test 3d Plotting od cosine similarity matrix
-def test3DPlotOfCosineSimilarity(allDict, num=None):
-
-    matrix=deriveSoftCosineSimilarityMatrix(allDict, num)
-    matout=calculateXYZByPCAMethod(matrix,8,0.69)
-    plotScatter3D(matout,"10 Groups, threshold 0.69", allDict)
+def test3DPlotOfCosineSimilarity(allDict, num=None, matrix=None,
+                                 numTopics=40, threshold=0.7, notebook=True):
+    if not matrix is not None :
+        matrix=deriveSoftCosineSimilarityMatrix(allDict, num)
+    matout=calculateXYZByPCAMethod(matrix,numTopics,threshold)
+    plotScatter3D(matout,"10 Groups, threshold 0.69", allDict,notebook=notebook)
 
     # can also do a simple perspective plot with matplot
-    show3D(matout)
+    # show3D(matout)
 
     # In case you need to clean up a previously used and abused matrix ..
     # newmatr=newmatr_svae.drop(columns=['pca-one', 'pca-two','pca-three','specGroup'])
 
     return
+#%% Test method for displaying 3d plot with topic
+def testCase():
+    """
+    Get docs from file, get list of titles+content, calculate (40) topics using 3,4 ngrams
+    map topics Add list of topics to each entry of the given allEntryDict for each topic
+    that has an LDA fuzzy relevance (see fuzzywuzzy process) of greater than the
+    specified threshold. Calculate SoftCosine-Similarity matrix with WordEmbeddings
+    fasttext_model300 (dimension 300) or GloVe (dimension 50)
+    save matrix to file
+    do spectral analysis and dimension reduction (PCA method) on similarity matrix
+    plotScatter3D with tool tips
+    """
+    allDict=loadAllFeedsFromFile()
+    docl=getDocList(allDict, reloaddocs=False,stop_list=getCustomStopWords())
+    topics= deriveTopicMaps(docl, maxNum=40, ngram_range=(3,4))
+    updateDictionaryByFuzzyRelevanceofTopics(topics,allDict, limit=None, threshold=60,remove=True )
+    trix=deriveSoftCosineSimilarityMatrix(allDict)
+    saveDFPickle(trix)
+    test3DPlotOfCosineSimilarity(allDict,None,trix)
+    return
+
 #%% Test run methods
 
 # Do one time only to get wordnet for Lemmatization
@@ -528,3 +551,12 @@ def test3DPlotOfCosineSimilarity(allDict, num=None):
 # showPyLDAvis(allDict, False)
 # showPyLDAvis(smallDict(allDict,10), False, 30)
 # test3DPlotOfCosineSimilarity(allDict, 500)
+
+# m=loadMatrixFile()
+# test3DPlotOfCosineSimilarity(allDict, 100, m[0])
+
+# m=loadMatrixFile()
+# allDict=loadAllFeedsFromFile()
+# test3DPlotOfCosineSimilarity(allDict, 500, m[1], 6, 0.5, notebook=False)
+
+

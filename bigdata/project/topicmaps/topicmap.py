@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 
 import importlib
 importlib.import_module("reader")
-from reader import loadAllFeedsFromFile,getStringContents, getAllTags
+from reader import loadAllFeedsFromFile,getStringContents, getAllTags,loadPickleArticles
 # importlib.import_module("rssreader.reader")
 # importlib.import_module("reader")
 # from reader import getDocList,loadAllFeedsFromFile,getStringContents
@@ -35,15 +35,19 @@ from reader import loadAllFeedsFromFile,getStringContents, getAllTags
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.decomposition import NMF, LatentDirichletAllocation
 from fuzzywuzzy import process # for Levenshtein  Distance calculations
+from nltk.tokenize.treebank import TreebankWordDetokenizer
 
 # Suppress annoying deprecation messages from nltk which I'm not going to fix yet
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
+from tqdm.notebook import trange, tqdm
 
 # TODO something for the readme.txt Do one time only to get wordnet for Lemmatization
 # import nltk
 # nltk.download() # --> and choose Corpora/wordnet
+# For data-structure visualization
+# conda install python-graphviz
+# pip install lolviz
 
 # Source: https://www.kaggle.com/arthurtok/spooky-nlp-and-topic-modelling-tutorial#3.-Topic-modelling
 
@@ -52,7 +56,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 def getDocList(allEntryDict=None, limit = None, reloaddocs= False, 
                stop_list=None, with_ids=False):
     """
-    
+    Returns either a list of RSSEntry contents with stop words removed, limited in length
+    to limit (if set) or, if with_ids is True, the article UIDs are zipped together
+    with the document contents.
 
     Parameters
     ----------
@@ -80,7 +86,7 @@ def getDocList(allEntryDict=None, limit = None, reloaddocs= False,
     docs=[]
     ids=[]
     i=0 # use to break out at limit
-    for key, val in allEntryDict.items():
+    for key, val in tqdm( allEntryDict.items(), desc="Removing Stop Words"):
         i +=1
         finalVal=val.collatedContents        
         if stop_list :   #substitute all phrases for ' ' case insensitive
@@ -99,25 +105,6 @@ class LemmaCountVectorizer(TfidfVectorizer):
     def build_analyzer(self):
         analyzer = super(LemmaCountVectorizer, self).build_analyzer()
         return lambda doc: (lemm.lemmatize(w) for w in analyzer(doc))
-    
-#%% print_top_words
-
-def print_top_words(model, feature_names, n_top_words):
-    for index, topic in enumerate(model.components_):
-        message = "\nTopic #{}:".format(index)
-        message += " ".join([feature_names[i] for i in topic.argsort()[:-n_top_words - 1 :-1]])
-        print(message)
-        print("="*70)
-        
-#%%
-# def 
-# text = list(train.text.values)
-# # Calling our overwritten Count vectorizer
-# tf_vectorizer = LemmaCountVectorizer(max_df=0.95, 
-#                                      min_df=2,
-#                                      stop_words='english',
-#                                      decode_error='ignore')
-# tf = tf_vectorizer.fit_transform(text)
 
 #%% Stop word processing
 def getCustomStopWords():
@@ -183,7 +170,6 @@ def removeStopWords(str, stop_words = getCustomStopWords()):
     for w in word_tokens:
         if w.lower() not in stop_words:
             filtered_sentence.append(w)
-    from nltk.tokenize.treebank import TreebankWordDetokenizer
 
     return TreebankWordDetokenizer().detokenize(filtered_sentence)
 
@@ -228,62 +214,6 @@ def deriveTopicMaps(sentences, stopW=getCustomStopWords(), maxNum=30, ngram_rang
     zipped = list(zip(feature_names, count_vec))
     return zipped
 
-#%% testTopicMaps
-def testTopicMaps(stopW="english"):
-    sentence = ["The stop_words_ attribute can get large and increase the model size when pickling. This attribute is provided only for introspection and can be safely removed using delattr or set to None before pickling.", 
-            "I love to eat Fries"]
-    vectorizer =LemmaCountVectorizer(min_df=0, stop_words=stopW)
-    sentence_transform = vectorizer.fit_transform(sentence)
-    
-    feature_names = vectorizer.get_feature_names()
-
-    count_vec = np.asarray(sentence_transform.sum(axis=0)).ravel()
-    zipped = list(zip(feature_names, count_vec))
-    return zipped
-
-#%%
-# def plotLeadingWords(topicList):
-#     x, y = (list(x) for x in zip(*sorted(topicList, key=lambda x: x[1], reverse=True)))
-#     # Now I want to extract out on the top 15 and bottom 15 words
-#     Y = np.concatenate([y[0:15], y[-16:-1]])
-#     X = np.concatenate([x[0:15], x[-16:-1]])
-    
-#     # Plotting the Plot.ly plot for the Top 50 word frequencies
-#     data = [go.Bar(
-#                 x = x[0:50],
-#                 y = y[0:50],
-#                 marker= dict(colorscale='Jet',
-#                              color = y[0:50]
-#                             ),
-#                 text='Word counts'
-#         )]
-    
-#     layout = go.Layout(
-#         title='Top 50 Word frequencies after Preprocessing'
-#     )
-    
-#     fig = go.Figure(data=data, layout=layout)
-    
-#     py.iplot(fig, filename='basic-bar')
-    
-#     # Plotting the Plot.ly plot for the Top 50 word frequencies
-#     data = [go.Bar(
-#                 x = x[-100:],
-#                 y = y[-100:],
-#                 marker= dict(colorscale='Portland',
-#                              color = y[-100:]
-#                             ),
-#                 text='Word counts'
-#         )]
-    
-#     layout = go.Layout(
-#         title='Bottom 100 Word frequencies after Preprocessing'
-#     )
-    
-#     fig = go.Figure(data=data, layout=layout)
-    
-#     py.iplot(fig, filename='basic-bar')
-#     return
 #%% unzipLeftSide
 def unzipLeftSide(iterable):
     return zip(*iterable).__next__()
@@ -292,12 +222,12 @@ def unzipLeftSide(iterable):
 # TODO Do same thing for CosineSimilarities (but multiply them by 100)
 # remake the matrix with the full Ids of the Documents, then write them back 
 # to the allEntryDict
-# need to do deletions (if at all) after testFuzz and testSoftCosine have
+# need to do deletions (if at all) after F and testSoftCosine have
 # been applied
 
-#%% testFuzz
+#%% updateDictionaryByFuzzyRelevanceofTopics
 
-def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
+def updateDictionaryByFuzzyRelevanceofTopics(topic_list, allEntryDict, limit = None, threshold=75, remove=False):
     """
     Add list of topics to each entry of the given allEntryDict for each topic
     that has a fuzzy relevance of greater than the specified threshold
@@ -325,7 +255,7 @@ def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
         allEntryDict=loadAllFeedsFromFile()
         
     i=0 # use to break out at limit
-    for key, val in allEntryDict.items():
+    for key, val in tqdm(allEntryDict.items(), desc='Fuzzy Relevance Testing'):
         html=""
         if hasattr(val , "content"):
             for line in val.content:
@@ -341,7 +271,8 @@ def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
         try:
             matchedTopics=process.extract(finalVal,topics)
         except:
-            print("An exception occurred with:", key)
+            toBeRemoved.append(key)
+            # print("An exception occurred with:", key)
         goodTops = [tupl for tupl in matchedTopics if tupl[1] > threshold]
         if len(goodTops) > 0:
             val["topiclist"]=goodTops
@@ -350,14 +281,23 @@ def testFuzz(topic_list, allEntryDict, limit = None, threshold=75):
             toBeRemoved.append(key)
         if limit and i > limit :
             break
-    # for gone in toBeRemoved:
-    #     allEntryDict.pop(gone)        
+
+    if remove:#remove non topics from dict
+        for gone in tqdm(toBeRemoved, desc="Removing documents"):
+            try:
+                allEntryDict.pop(gone)
+            except:
+                print ("removal of", key, "not possible")
+
     return toBeRemoved
 
 #%% displayTopicsAndFeeds
 def displayTopicsAndFeeds(allItemDict, numTopics=30):
     sns.set()
     # plt.xticks(rotation=60)
+    # plt.figure(figsize=(50,100))
+    sns.set(rc={'figure.figsize':(13,13)})
+
     plt.xticks(rotation=45, horizontalalignment='right')
     feedTuple=getAllFeedTopics(allItemDict)
     
@@ -375,13 +315,16 @@ def displayTopicsAndFeeds(allItemDict, numTopics=30):
     df2=makeTopicMatrix(df)
     sns.set_context("paper", font_scale=1.0)
     # sns.set_style("whitegrid", {'axes.grid' : False})
-    cmap = sns.cubehelix_palette (dark = .3, light=.8, as_cmap=True)
+    # cmap = sns.cubehelix_palette (dark = .3, light=.8, as_cmap=True)
+    cmap = sns.cubehelix_palette (10, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=True)
+
     ax = sns.scatterplot(data=df2,x="Feeds", y="Topics", size="Number", 
-                         hue="Number",sizes=(100,300), markers = False)
-    ax.tick_params(labelsize=5)
-    plt.title("Topic Usage in RSS Feeds")
+                         hue="Number",sizes=(100,300), markers = False, palette=cmap)
+    ax.tick_params(labelsize=12)
+    plt.title("Topic Usage in RSS Feeds", fontsize=20)
+    plt.tight_layout()
     plt.show()
-    return ax
+    return
 
 #%% populateTopicMatrix
 
@@ -441,20 +384,7 @@ def preProcessDocs(docList):
 
     return newDocList
 
-#%% smallDict utility
-def smallDict(d, sample=10):
-    keys = random.sample(list(d), sample)
-    values = [d[k] for k in keys]
-    return dict(zip(keys, values))
-
-def doStandardInitialize():
-    allDict=loadAllFeedsFromFile()
-    docl=getDocList(smallDict(allDict,500), reloaddocs=False,stop_list=getCustomStopWords())
-    # docl=preProcessDocs(docs)
-    topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
-    testFuzz(topics,smallDict(allDict,500), limit=None, threshold=70)
-    return
-#%%
+#%% getAllFeedTopics
 
 def getAllFeedTopics(allDocDict):
     """
@@ -486,7 +416,7 @@ def getAllFeedTopics(allDocDict):
         feedTopicnamesdict[key]=list(val)
         
     return (feedTopicdict,feedTopicnamesdict)
-#%%
+#%% makeTopicMatrix
 def makeTopicMatrix(df):
         
     allTopics=[]
@@ -503,7 +433,7 @@ def makeTopicMatrix(df):
     return df
  
 #%% getAllTopics
-# Has to have testFuzz called beforehand to populate topiclist correctly
+# Has to have updateDictionaryByFuzzyRelevanceofTopics called beforehand to populate topiclist correctly
 def getAllTopics(allDocDict):
     
     topics=[]
@@ -523,6 +453,28 @@ def getAllTopics(allDocDict):
 
     return topics
 
+#%% smallDict utility
+def smallDict(d, sample=10):
+    keys = random.sample(list(d), sample)
+    values = [d[k] for k in keys]
+    return dict(zip(keys, values))
+
+#%% doStandardInitialize
+def doStandardInitialize(remove=False):
+    allDict=loadAllFeedsFromFile()
+    docl=getDocList(smallDict(allDict,500), reloaddocs=False,stop_list=getCustomStopWords())
+    # docl=preProcessDocs(docs)
+    topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
+    updateDictionaryByFuzzyRelevanceofTopics(topics,smallDict(allDict,500), limit=None, threshold=70, remove=remove)
+    return allDict
+#%% doStandardInitialize
+def doFullTopicInitialize(remove=False, maxNum=30, ngram_range=(3,3),threshold=70):
+    allDict=loadAllFeedsFromFile()
+    docl=getDocList(allDict, reloaddocs=False,stop_list=getCustomStopWords())
+    # docl=preProcessDocs(docs)
+    topics= deriveTopicMaps(docl, maxNum=maxNum, ngram_range=ngram_range)
+    updateDictionaryByFuzzyRelevanceofTopics(topics,allDict, limit=None, threshold=threshold, remove=remove)
+    return allDict
 #%% testDisplayTopicsAndFeeds Scatterplot
 def testDisplayTopicsAndFeeds(numArticles=300, dict=None, numTopics=30,
                               ngram_range=(3,3)):
@@ -533,7 +485,7 @@ def testDisplayTopicsAndFeeds(numArticles=300, dict=None, numTopics=30,
                     reloaddocs=False,
                     stop_list=getCustomStopWords())
     topics= deriveTopicMaps(docl, maxNum=numTopics, ngram_range=ngram_range)
-    testFuzz(topics,dict) # populates topiclist in dict entries
+    updateDictionaryByFuzzyRelevanceofTopics(topics,dict) # populates topiclist in dict entries
     displayTopicsAndFeeds(dict)
     return
 
@@ -547,8 +499,8 @@ def testDisplayTopicsAndFeeds(numArticles=300, dict=None, numTopics=30,
 # # topics= deriveTopicMaps(docl,ngram_range=(1,2)) # Produces nonsense
 # # topics= deriveTopicMaps(docl,ngram_range=(2,2)) # Produces recognisable topics but with many repetitions in different constellations
 # topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,4)) # Produces recognisable topics but with many repetitions in different constellations
-# # testFuzz(topics,allDict, limit=10)
-# len(testFuzz(topics,allDict, limit=None, threshold=70))
+# # updateDictionaryByFuzzyRelevanceofTopics(topics,allDict, limit=10)
+# len(updateDictionaryByFuzzyRelevanceofTopics(topics,allDict, limit=None, threshold=70, remove=True))
 # # topics= deriveTopicMaps(docl,ngram_range=(4,4), maxNum=20) # with 4,4 you find completely differnt tabloid type stories (possibly they are all agency copy+paste stories?)
 # allDict1=loadAllFeedsFromFile()
 # small=smallDict(allDict1,300)

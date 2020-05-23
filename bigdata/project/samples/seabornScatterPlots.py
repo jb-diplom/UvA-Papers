@@ -15,29 +15,9 @@ import importlib
 importlib.import_module("reader")
 from reader import loadAllFeedsFromFile,getStringContents, getAllTags
 importlib.import_module("topicmap")
-from topicmap import getDocList, smallDict, getAllTopics, deriveTopicMaps,testFuzz, getCustomStopWords
-# tips = sns.load_dataset("tips")
-# ax = sns.scatterplot(x="total_bill", y="tip", data=tips)
-
-
-# # ax = sns.scatterplot(x="total_bill", y="tip", hue="time",
-# #                      data=tips)
-# ax = sns.scatterplot(x="total_bill", y="tip",
-#                       hue="day", style="time", data=tips)
+from topicmap import getDocList, smallDict, getAllTopics, deriveTopicMaps,updateDictionaryByFuzzyRelevanceofTopics, getCustomStopWords
 import seaborn as sns
 sns.set()
-#%%
-
-
-# # Load the example planets dataset
-# planets = sns.load_dataset("planets") 
-
-# cmap = sns.cubehelix_palette(rot=-.2, as_cmap=True)
-# ax = sns.scatterplot(x="distance", y="orbital_period",
-#                       hue="year", size="mass",
-#                       palette=cmap, sizes=(10, 200),
-#                       data=planets)
-
 
 #%% displayTopics
 # https://www.drawingfromdata.com/how-to-rotate-axis-labels-in-seaborn-and-matplotlib (sizing)
@@ -61,9 +41,10 @@ def displayTopics(topics):
     topData = topData.sort_values('Frequency',ascending=True).reset_index()
     
     # Plot the total crashes
-    sns.set_color_codes("pastel")
+    # sns.set_color_codes("pastel")
+    cmap = sns.cubehelix_palette (40, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=False)
     sns.barplot(y="Frequency", x="Topic", data=topData,
-                label="Topics", palette="Blues_d")
+                label="Topics", palette=cmap)
     
     # Plot the crashes where alcohol was involved
     # sns.set_color_codes("muted")
@@ -108,9 +89,12 @@ def getAuthors(inDict):
     return authors
 
 #%% displayAuthors
-def displayAuthors(theAuthors):
+def displayAuthors(theAuthors=None, dict=None):
     sns.set(style="whitegrid")
-    
+
+    if not theAuthors:
+        theAuthors=getAuthors(dict)
+
     # Initialize the matplotlib figure
     authorfig, ax = plt.subplots(figsize=(16,20))
     plt.subplots_adjust()
@@ -125,15 +109,12 @@ def displayAuthors(theAuthors):
     authList = authList.sort_values('Frequency',ascending=True).reset_index()
     
     # Plot the total crashes
-    sns.set_color_codes("pastel")
+    # sns.set_color_codes("pastel")
+    cmap = sns.cubehelix_palette (40, dark = .3, light=.8,start=0.9,
+                                  rot=-1.0,gamma=0.8, as_cmap=False)
     sns.barplot(y="Authors", x="Frequency", data=authList,
-                label="Authors", palette="Blues_d")
-    
-    # Plot the crashes where alcohol was involved
-    # sns.set_color_codes("muted")
-    # sns.barplot(x="alcohol", y="abbrev", data=crashes,
-    #             label="Alcohol-involved", color="b")
-    
+                label="Authors", palette=cmap)
+
     # Add a legend and informative axis label
     ax.legend(ncol=2, loc="lower right", frameon=True)
     ax.set(xlim=(0, max(frequen)+5), xlabel="",
@@ -225,7 +206,11 @@ def makeTagMatrix(df):
 #%% displayTags
 def displayTags(allItemDict):
     sns.set()
+    sns.set(style="whitegrid")
     # plt.xticks(rotation=60)
+    # plt.figure(figsize=(16,20))
+    sns.set(rc={'figure.figsize':(13,13)})
+
     plt.xticks(rotation=45, horizontalalignment='right')
     feedTuple=getAllFeedtags(allItemDict)
     
@@ -241,25 +226,33 @@ def displayTags(allItemDict):
     df = pd.DataFrame(data= matr, columns=tagnames, index=feeds)
     populateTagMatrix(allItemDict, df)
     df2=makeTagMatrix(df)
-    sns.set_context("paper", font_scale=1.0)
+    # sns.set_context("paper", font_scale=1.0)
     # sns.set_style("whitegrid", {'axes.grid' : False})
-    cmap = sns.cubehelix_palette (dark = .3, light=.8, as_cmap=True)
-    ax = sns.scatterplot(data=df2,x="Feeds", y="Tags", size="Number", 
-                         hue="Number",sizes=(30,300), markers = False) 
-    ax.tick_params(labelsize=5)
-    plt.title("Tag Usage in RSS Feeds")
+    # cmap = sns.cubehelix_palette (5, dark = .2, light=.6,start=2.6, rot=0,gamma=0.8, as_cmap=True)
+    # cmap = sns.dark_palette("blue",n_colors=6)
+    # sns.set_palette(sns.color_palette("Paired", as_cmp=True))
+    # cmap=sns.color_palette("Blues")
+    cmap = sns.cubehelix_palette (10, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=True)
+
+    ax = sns.scatterplot(data=df2,x="Feeds", y="Tags", size="Number",
+                         hue="Number",sizes=(50,400), markers = False, palette=cmap) #"Blues_r"
+    ax.tick_params(labelsize=12)
+    plt.title("Tag Usage in RSS Feeds", fontsize=20)
     plt.show()
-    return ax
+    return
 
 #%% testDisplayTopics Histogram
-def testDisplayTopics(numArticles=300, numTopics=30, dict=None):
+def testDisplayTopics(numArticles=None, numTopics=30, dict=None):
     if not dict:
         dict=loadAllFeedsFromFile()
-    small=smallDict(dict,numArticles)
+    if not numArticles:
+        small=smallDict(dict,numArticles)
+    else:
+        small=dict
     docl=getDocList(small, reloaddocs=False, stop_list=getCustomStopWords())
     # docl=getDocList(small, reloaddocs=False)
     topics= deriveTopicMaps(docl, maxNum=numTopics, ngram_range=(3,3))
-    testFuzz(topics, small, limit=30)
+    updateDictionaryByFuzzyRelevanceofTopics(topics, small, limit=30)
     displayTopics(topics)
     return
 
@@ -268,7 +261,7 @@ def testDisplayAuthors(numArticles=300, dict=None):
     if not dict:
         dict=loadAllFeedsFromFile()
     small=smallDict(dict,numArticles)
-    displayAuthors(getAuthors(small))
+    displayAuthors(dict = small)
     return
 
 #%% testDisplayTags Scatterplot
@@ -280,8 +273,8 @@ def testDisplayTags(numArticles=300, dict=None):
     return
 
 #%%
-allDict1=loadAllFeedsFromFile()
-small=smallDict(allDict1,300)
-testDisplayTopics(dict=small)
-testDisplayAuthors(dict=small)
-testDisplayTags(dict=small)
+# allDict1=loadAllFeedsFromFile()
+# small=smallDict(allDict1,300)
+# testDisplayTopics(dict=small)
+# testDisplayAuthors(dict=small)
+# testDisplayTags(dict=small)

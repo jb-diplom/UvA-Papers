@@ -87,4 +87,17 @@ df.index # gets the index column of a DataFrame
 df.index[0] # gets the value of the first index
 
 # Add a column
-df['pca-three'] = pca_result[:,2] # in this case the second column of the 
+df['pca-three'] = pca_result[:,2] # in this case the second column of the
+
+#%% Choose colours for seaborn in a notebook
+import seaborn as sns
+sns.choose_cubehelix_palette()
+#%% Visualize data-structures
+from graphviz import *
+from lolviz import *
+data = ['hi','mom',{3,4},{"parrt":"user"}]
+g = listviz(data)
+print(g.source) # if you want to see the graphviz source
+g.view() # render and show graphviz.files.Source object
+
+

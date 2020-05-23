@@ -14,18 +14,20 @@ from IPython import display
 import pandas as pd
 import seaborn as sns; sns.set()
 import matplotlib.pyplot as plt
-import numpy as np
 import datetime
-from datetime import timedelta
-from dateutil.parser import *
+from dateutil.parser import parse
 from bs4 import BeautifulSoup
 import pickle
 import glob
-from collections import Counter
 import collections
-import re
 import time
 from collections import Counter, defaultdict
+import os
+
+from tqdm.notebook import trange, tqdm
+# from tqdm import trange, tqdm
+# from tqdm.auto import tqdm, trange
+
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -54,8 +56,8 @@ def outputSummary(theDict):
     
     pd.set_option('display.max_rows', 40)
     pd.set_option('display.max_columns', 40)
-    pd.set_option('display.width', 80)
-    pd.set_option('display.max_colwidth', 40)
+    pd.set_option('display.width', 100)
+    pd.set_option('display.max_colwidth', 80)
     # sample data
     df1 = pd.DataFrame(theDict)
     
@@ -108,7 +110,7 @@ def getStringContents(content):
 def savePickle(dictOut):
     now=datetime.datetime.now()
     runtimeStr=now.strftime("%d%m%Y_%H%M%S")    # for saving datafiles uniquely
-    outfileName="../rssreader/data/feed" + runtimeStr + ".pickle"
+    outfileName="rssreader/data/feed" + runtimeStr + ".pickle"
     with open(outfileName, 'wb') as outfile:
         pickle.dump(dictOut, outfile, pickle.HIGHEST_PROTOCOL)
         
@@ -127,12 +129,8 @@ def loadPickleArticles(fileName):
         dictIn.pop(key, None)
     return dictIn
 
-#%% collectArticles
-
-def collectArticles():
-    
-    # Primary source of feeds https://blog.feedspot.com/world_news_rss_feeds/
-    # TODO put feed data in a separate configurable dictionary
+#%% summarizeItems
+def getFeedDict():
     myfeeds= {
     "NY Times" : "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml",
     "Buzzfeed" : "https://www.buzzfeed.com/world.xml",
@@ -141,7 +139,6 @@ def collectArticles():
     "Global Issues" : "http://www.globalissues.org/news/feed",
     "The Cifer Brief" : "https://www.thecipherbrief.com/feed",
     "Yahoo" : "https://www.yahoo.com/news/world/rss",
-    # "CNN" : "http://rss.cnn.com/rss/edition_world.rss",
     "Times of India" : "https://timesofindia.indiatimes.com/rssfeeds/296589292.cms",
     "The Guardian" : "https://www.theguardian.com/world/rss",
     "CNBC" : "https://www.cnbc.com/id/100727362/device/rss/rss.html",
@@ -169,7 +166,6 @@ def collectArticles():
     "Annals Hub" : "https://annalshub.com/feed/",
     "Z6 Mag" : "https://z6mag.com/feed/",
     "HGS Media Plus" : "https://hgsmediaplus.com.ng/feed/",
-    # "Digital.Alive World": "https://digitalive.world/feed/",
     "The Next Hint": "https://www.thenexthint.com/feed/",
     "Africa Launch Pad" : "https://africalaunchpad.com/feed/",
     "International Security Journal" : "https://internationalsecurityjournal.com/feed/",
@@ -187,32 +183,39 @@ def collectArticles():
     "Global Vision UK":"https://globalvisionuk.com/feed/",
     "Just World News" : "https://justworldnews.org/feed/"
     }
+    return myfeeds
+#%% collectArticles
+
+def collectArticles(myfeeds=getFeedDict()):
+    
+    # Primary source of feeds https://blog.feedspot.com/world_news_rss_feeds/
+    # TODO put feed data in a separate configurable dictionary
+
     
     allFeeds={}
     # The critical collection of all articles
     # TODO tries=collections.defaultdict(lambda : None)
     allEntries={}
+    # bar = trange(len(myfeeds.items()))
 
-    for feedName, feedURL in myfeeds.items():
-        tic = time.perf_counter()   # start timing
+    # for feedName, feedURL in myfeeds.items():
+    for feedName, feedURL in tqdm(myfeeds.items(),desc="Loading feed data"):
         feed = feedparser.parse(feedURL)
         allFeeds[feedURL]=feed
         feed.entries = enhanceEntries(feed.entries, feed.href, feedName)
         addEntries(feed.entries, allEntries)
-        toc = time.perf_counter()   # end timing
         # if hasattr(feed , "entries") and hasattr(feed.entries[0] , "content"):
         #     print (f"{feedName: >30}Content Loaded in: {toc - tic:0.4f} seconds")
         # else:
-        print (f"{feedName: >30}Summary Loaded in: {toc - tic:0.4f} seconds")
+        # tqdm.write(f"{feedName: >30}Summary Loaded in: {toc - tic:0.4f} seconds")
+        tqdm.write(feedName)
 
     # populates collatedContents and removes any RSS-Entries with no contents
-    # or summary detail
+    # or summary detail or spurious content
     collateDocContents(allEntries)
     return savePickle(allEntries)
- 
-#%% summarizeItems
-
-def summarizeItems(dict1):
+#%%
+def summarizeItems(dict1=getFeedDict()):
     """
     Takes dictionary of RSS Items per media outlet and returns a simple 
     panda table of the contents
@@ -262,7 +265,7 @@ def summarizeItems(dict1):
 def summarizeByDate(dict1):
     """
     Takes dictionary of RSS Items per media outlet and returns a Seaborn 
-    swarmplot grouped by dates
+    swarmplot/violinplot grouped by dates
 
     Parameters
     ----------
@@ -278,21 +281,17 @@ def summarizeByDate(dict1):
     articleDate=[]
     articleSize=[]
     feedNames=[]
-    
-    for uid, val  in dict1.items():
+    sns.set(rc={'figure.figsize':(13,17)})
+
+    for uid, val  in tqdm(dict1.items(), desc="Summarizing by date"):
         # print("processing", uid)
         dt=None
         if hasattr(val , "published"):
             dt=parse(val.published, ignoretz=True)
         else:
             dt=parse(val.updated, ignoretz=True)
-        dt=dt.strftime('%d, %b %Y')
-            
-        # if dateOlderThan(dt):
-        #     dt="Archive Articles"            
-        # else:
-        #     dt=dt.strftime('%d, %b %Y')
-            
+
+        dt=dt.strftime('%d, %m %Y')
         articleDate.append(dt)
         feedNames.append(val.feed_name)
 # TODO add actual content etc for tooltip (in val.collatedContents)
@@ -302,17 +301,20 @@ def summarizeByDate(dict1):
     outDict={"Source":feedNames, "Article Size (words)":articleSize, "Date":articleDate}
     df = pd.DataFrame(outDict)
     df = df.sort_values('Date',ascending=True).reset_index()
+    paired50=sns.color_palette("hls", n_colors=50)
     # strip =sns.stripplot (data=df, x="Date", y ="Article Size (words)", hue="Source", jitter = 0.25,  orient = "h" )
-    swarm=sns.violinplot(x="Date", y="Article Size (words)", hue="Source", data=df, vert=False, width=40, height=12, aspect= 20)
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', fontsize= "xx-small",ncol=2)
+    # swarm=sns.violinplot(y="Date", x="Article Size (words)", fontsize= "12", hue="Source", data=df, vert=False, width=20, height=40, aspect= 40)
+    cmap = sns.cubehelix_palette (50, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=False)
+    swarm=sns.boxplot(y="Date", x="Article Size (words)", hue="Source", data=df, width=20, palette=paired50)
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', fontsize= "14",ncol=1)
     #swarm=sns.catplot(x="Date", y="Article Size (words)", hue="Source", orient = "h", kind="swarm", data=df, height=4, aspect= 1.5);
    
     #sns.set_yticklabels(sns.get_yticklabels(), fontsize=7)
     # swarm=sns.catplot(x="Date", y="Article Size (words)", hue="Source", kind="swarm", data=df);
     plt.xticks(rotation = 45, horizontalalignment="right" )
-    # swarm=sns.violinplot(x="Date", y="ArticleSize", data=df);
+    plt.tight_layout()
 
-    return swarm
+    return
 
 
 #%% getNoPub
@@ -383,8 +385,9 @@ def articleId(feedParserDict):
     # Load all pickle files found in given relative directrory and 
     # merge to one dictionary of unique items
 
-def loadAllFeedsFromFile(path = "../rssreader/data" ): #this is probably a stupid place for the data long term
-    allDict=collections.defaultdict(lambda : None)
+def loadAllFeedsFromFile(path = "rssreader/data" ): #this is probably a stupid place for the data long term
+    # allDict=collections.defaultdict(lambda : None)
+    allDict={}
     for file in glob.glob(path + "/*.pickle"):
         print ("loading file: ", file)
         dict1=loadPickleArticles(file)
@@ -426,7 +429,9 @@ def collateDocContents(allEntryDict, deleteBadEntries=True):
     If deleteBadEntries is specified, then additionally all entries without 
     Content or summary_detail are removed from the supplied allEntryDict, as 
     are legacy articles older than the start of project (see: dateOlderThan 
-    function)
+    function). 
+    Remove NYT daily briefings, which skew topics/clustering like crazy whilst
+    having almost no content
 
     Parameters
     ----------
@@ -440,7 +445,8 @@ def collateDocContents(allEntryDict, deleteBadEntries=True):
     """
 
     toBeRemoved=[]
-    for key, val in allEntryDict.items():
+    items=allEntryDict.items()# help tqdm
+    for key, val in tqdm(items, desc="Collating Contents"):
         html=""
         if hasattr(val , "content"):
             for line in val.content:
@@ -463,10 +469,14 @@ def collateDocContents(allEntryDict, deleteBadEntries=True):
             if dateOlderThan(dt):
                 toBeRemoved.append(key)  
         except:
-            toBeRemoved.append(key)  
- 
+            toBeRemoved.append(key)
+
+        # Remove NYT daily briefings, which skew topics/clustering like crazy
+        if val.feed_name == "NY Times" and "you need to know" in val.collatedContents:
+            toBeRemoved.append(key)
+
     if deleteBadEntries:    # remove all old entries or those without contents
-        for gone in toBeRemoved:    
+        for gone in tqdm(toBeRemoved, desc="Deleting bad entries"):
             allEntryDict.pop(gone)   
          
     return  

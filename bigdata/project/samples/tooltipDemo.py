@@ -61,8 +61,9 @@ show(p)
 
 #%% Matplot Tooltip demo
 
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt,mpld3
 import numpy as np; np.random.seed(1)
+import seaborn as sns; sns.set()
 
 x = np.random.rand(15)
 y = np.random.rand(15)
@@ -73,7 +74,8 @@ norm = plt.Normalize(1,4)
 cmap = plt.cm.RdYlGn
 
 fig,ax = plt.subplots()
-sc = plt.scatter(x,y,c=c, s=100, cmap=cmap, norm=norm)
+# sc = plt.scatter(x,y,c=c, s=100, cmap=cmap, norm=norm)
+sc=sns.boxplot(y=x, x=y, hue=c, width=20, palette="Blues")
 
 annot = ax.annotate("", xy=(0,0), xytext=(20,20),textcoords="offset points",
                     bbox=dict(boxstyle="round", fc="w"),
@@ -107,3 +109,27 @@ def hover(event):
 fig.canvas.mpl_connect("motion_notify_event", hover)
 
 plt.show()
+#%% Matplot tooltips hack
+import numpy as np
+import matplotlib.pyplot as plt, mpld3
+import seaborn as sns
+import pandas as pd
+
+N=10
+data = pd.DataFrame({"x": np.random.randn(N),
+                     "y": np.random.randn(N), 
+                     "size": np.random.randint(20,200, size=N),
+                     "label": np.arange(N)
+                     })
+
+
+scatter_sns = sns.lmplot("x", "y", 
+           scatter_kws={"s": data["size"]},
+           robust=False, # slow if true
+           data=data, size=8)
+fig = plt.gcf()
+
+tooltip = mpld3.plugins.PointLabelTooltip(fig, labels=list(data.label))
+mpld3.plugins.connect(fig, tooltip)
+
+mpld3.display(fig)
