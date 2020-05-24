@@ -249,16 +249,41 @@ def summarizeItems(dict1=getFeedDict()):
     # print(len(feedNames), len(storyTitle), len(contentType))
     outDict={"Source":feedNames, "Title":storyTitle, "Content":contentType}
     pa_table=outputSummary(outDict)    
-    
-    # Example of HTML parsing
-    # first = next(iter(dict1.values()))
-    
-    # if hasattr(first , "content"):
-    #     htm=first.content[0]["value"]
-    # else:
-    #     htm=first.summary_detail.value
-        
     return pa_table
+#%%
+def summarizeFeeds(dict1=getFeedDict()):
+    """
+    Takes dictionary of feeds and URLs, and displays them in a pandas table
+
+    Parameters
+    ----------
+    dict1 : dict
+        DESCRIPTION key values of Feed Names and FeedParserDicts
+
+    Returns
+    -------
+    pa_table : Panda Table
+        DESCRIPTION. With three columns Source | Title | Content-Type
+
+    """
+    feedNames=[]
+    urls=[]
+    
+    for key, val  in sorted(dict1.items()):
+        feedNames.append(key)
+        urls.append(val)
+
+    theDict={"Source":feedNames, "Feed":urls}
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', 40)
+    pd.set_option('display.width', 160)
+    pd.set_option('display.max_colwidth', -1)
+    pd.set_option('display.expand_frame_repr', False)
+
+    # sample data
+    df = pd.DataFrame(theDict)
+    display.display(df)
+    return
 
 #%% summarizeByDate
 
@@ -281,24 +306,16 @@ def summarizeByDate(dict1):
     articleDate=[]
     articleSize=[]
     feedNames=[]
-    sns.set(rc={'figure.figsize':(13,17)})
+    sns.set(rc={'figure.figsize':(14,17)})
 
     for uid, val  in tqdm(dict1.items(), desc="Summarizing by date"):
-        # print("processing", uid)
-        dt=None
-        if hasattr(val , "published"):
-            dt=parse(val.published, ignoretz=True)
-        else:
-            dt=parse(val.updated, ignoretz=True)
-
-        dt=dt.strftime('%d, %m %Y')
-        articleDate.append(dt)
+        articleDate.append(getRssArticleDate(val))
         feedNames.append(val.feed_name)
 # TODO add actual content etc for tooltip (in val.collatedContents)
 # TODO add tags and/or topics to use instead of feedname in swarmplot
-        articleSize.append(len(val.collatedContents.split()))
+        articleSize.append(getRssArticleSize(val))
             
-    outDict={"Source":feedNames, "Article Size (words)":articleSize, "Date":articleDate}
+    outDict={"Source":feedNames, "Article Size (words)":articleSize, "Date":articleDate, "labels":feedNames}
     df = pd.DataFrame(outDict)
     df = df.sort_values('Date',ascending=True).reset_index()
     paired50=sns.color_palette("hls", n_colors=50)
@@ -306,7 +323,15 @@ def summarizeByDate(dict1):
     # swarm=sns.violinplot(y="Date", x="Article Size (words)", fontsize= "12", hue="Source", data=df, vert=False, width=20, height=40, aspect= 40)
     cmap = sns.cubehelix_palette (50, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=False)
     swarm=sns.boxplot(y="Date", x="Article Size (words)", hue="Source", data=df, width=20, palette=paired50)
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', fontsize= "14",ncol=1)
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', fontsize= "16",ncol=1)
+
+    #Tooltips
+    import matplotlib.pyplot as plt, mpld3
+    fig = plt.gcf()
+    tooltip = mpld3.plugins.PointLabelTooltip(fig, labels=list(outDict["labels"]))
+    mpld3.plugins.connect(fig, tooltip)
+
+
     #swarm=sns.catplot(x="Date", y="Article Size (words)", hue="Source", orient = "h", kind="swarm", data=df, height=4, aspect= 1.5);
    
     #sns.set_yticklabels(sns.get_yticklabels(), fontsize=7)
@@ -315,12 +340,33 @@ def summarizeByDate(dict1):
     plt.tight_layout()
 
     return
+#%%
+def appendRssArticleDateAndSize(rssentry):
+    if not (bool(rssentry["articleDate"])):
+        if hasattr(rssentry , "published"):
+            dt=parse(rssentry.published, ignoretz=True)
+        else:
+            dt=parse(rssentry.updated, ignoretz=True)
+        
+        dt=dt.strftime('%d, %m %Y')
+        rssentry["articleDate"]=dt
 
+    if not (bool(rssentry["articleSize"])):
+        rssentry["articleSize"]=len(rssentry.collatedContents.split())
+    return
+
+def getRssArticleDate(rssentry):
+    appendRssArticleDateAndSize(rssentry)
+    return rssentry["articleDate"]
+
+def getRssArticleSize(rssentry):
+    appendRssArticleDateAndSize(rssentry)
+    return rssentry["articleSize"]
 
 #%% getNoPub
 
 def getNoPub(dict1):
-    
+
     for uid, val  in dict1.items():
         # print("processing", uid)
         if not hasattr(val , "published") and not hasattr(val , "updated") :
@@ -483,7 +529,7 @@ def collateDocContents(allEntryDict, deleteBadEntries=True):
 
 #%% getAllTags
 
-def getAllTags(allDocDict, reload=False):
+def getAllTags(allDocDict, reload=False, displayAmount=30):
     
     if reload :
         allDocDict = loadAllFeedsFromFile()
@@ -499,20 +545,9 @@ def getAllTags(allDocDict, reload=False):
         else:
             nwithout +=1
             
-    print("="*90,  "\nThere were", nwith, "items with tags and", nwithout, "without tags")
+    print("\nThere were", nwith, "articles with tags and", nwithout, "without tags")
     c_tags=Counter(tags)
-    print("="*90, "\nThese are the 10 most frequent tags used:\n","="*90,"\n",c_tags.most_common(20))
-
-# ========================================================================================== 
-# There were 1856 items with tags and 3912 without tags)
-# ========================================================================================== 
-# These are the 20 most frequent tags used:
-#  ========================================================================================== 
-#  [('News', 343), ('Coronavirus', 212), ('World News', 206), ('worldNews', 190), ('World', 145),
-# ('World news', 120), ('Coronavirus outbreak', 119), ('Uncategorized', 112), ('Business', 91), 
-# ('Sports', 88), ('COVID-19', 87), ('Health', 81), ('National News', 78), ('Covid-19 Pandemic', 72), 
-# ('China', 71), ('Europe', 67), ('USA', 57), ('Society', 57), ('Baltic states', 57), ('US news', 54)]
-# len(set(tags)) --> 2797 unique tags
+    # print("="*90, "\nThese are the",displayAmount,"most frequent tags used:\n","="*90,"\n",c_tags.most_common(displayAmount))
 
     return tags
 

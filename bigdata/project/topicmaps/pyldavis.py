@@ -26,14 +26,14 @@ def load_R_model(filename):
             'term_frequency': data_input['term.frequency']}
     return data
 
-output_file("pyDAVis.html")
+f=output_file("pyDAVis.html")
 # output_notebook() # TODO for use in notebook
     # pyLDAvis.enable_notebook()
 movies_model_data = load_R_model('data/movie_reviews_input.json')
 
 
 movies_vis_data = pyLDAvis.prepare(**movies_model_data)
-# p=pyLDAvis.display(movies_vis_data) # should use this in notebook
-p=pyLDAvis.show(movies_vis_data) # displays in own window combined with output_file
+p=pyLDAvis.display(movies_vis_data) # should use this in notebook
+# p=pyLDAvis.show(movies_vis_data) # displays in own window combined with output_file
 show(p)
 

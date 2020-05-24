@@ -45,12 +45,7 @@ def displayTopics(topics):
     cmap = sns.cubehelix_palette (40, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=False)
     sns.barplot(y="Frequency", x="Topic", data=topData,
                 label="Topics", palette=cmap)
-    
-    # Plot the crashes where alcohol was involved
-    # sns.set_color_codes("muted")
-    # sns.barplot(x="alcohol", y="abbrev", data=crashes,
-    #             label="Alcohol-involved", color="b")
-    
+
     # Add a legend and informative axis label
     ax.legend(ncol=2, loc="lower right", frameon=True)
     ax.set(ylim=(0, max(freq)+5), xlabel="",
@@ -87,6 +82,27 @@ def getAuthors(inDict):
      #     if (len(auth))
     print("With author:",nwith, "Without author:", nwithout)
     return authors
+#%% simpleTagDisplay Histogram
+def simpleTagDisplay(ax,tagnames,tagNumbers):
+
+    tagList = pd.DataFrame({"Tags": tagnames,
+                        "Frequency":tagNumbers
+                         })
+    tagList = tagList.sort_values('Frequency',ascending=True).reset_index()
+    
+    # Plot the total crashes
+    # sns.set_color_codes("pastel")
+    cmap = sns.cubehelix_palette (40, dark = .3, light=.8,start=0.9,
+                                  rot=-1.0,gamma=0.8, as_cmap=False)
+    sns.barplot(y="Tags", x="Frequency", data=tagList,
+                label="Tags", palette=cmap)
+
+    # Add a legend and informative axis label
+    ax.legend(ncol=2, loc="lower right", frameon=True)
+    ax.set(xlim=(0, max(tagNumbers)+5), xlabel="",
+            ylabel="Tags designated to articles")
+    plt.title("Tag Frequency Overall", fontsize=20)
+    return
 
 #%% displayAuthors
 def displayAuthors(theAuthors=None, dict=None):
@@ -204,40 +220,42 @@ def makeTagMatrix(df):
  
 
 #%% displayTags
-def displayTags(allItemDict):
-    sns.set()
-    sns.set(style="whitegrid")
-    # plt.xticks(rotation=60)
-    # plt.figure(figsize=(16,20))
-    sns.set(rc={'figure.figsize':(13,13)})
+def displayTags(allItemDict, displayAmount=30):
 
-    plt.xticks(rotation=45, horizontalalignment='right')
+    sns.set(style="whitegrid")
+    sns.set(rc={'figure.figsize':(14,5+displayAmount*0.75)})
+
     feedTuple=getAllFeedtags(allItemDict)
     
     feeds=[]
-    allTags=getAllTags(allItemDict)
+    allTags=getAllTags(allItemDict, displayAmount=displayAmount)
     c_tags=Counter(allTags)
-    top30=c_tags.most_common(30)
-    tagnames=[item[0] for item in top30]
+    topN=c_tags.most_common(displayAmount)
+    tagnames=[item[0] for item in topN]
+    tagNumbers=[item[1] for item in topN]
     for feed,nrTags in feedTuple[0].items():
         feeds.append(feed)
-    
+
+    fig = plt.figure()
+    ax = fig.add_subplot(211)
+    widg1=simpleTagDisplay(ax,tagnames,tagNumbers)
+
+    plt.xticks(rotation=45, horizontalalignment='right')
+
     matr=np.zeros( (len(feeds),len(tagnames) ) )
     df = pd.DataFrame(data= matr, columns=tagnames, index=feeds)
     populateTagMatrix(allItemDict, df)
     df2=makeTagMatrix(df)
-    # sns.set_context("paper", font_scale=1.0)
-    # sns.set_style("whitegrid", {'axes.grid' : False})
-    # cmap = sns.cubehelix_palette (5, dark = .2, light=.6,start=2.6, rot=0,gamma=0.8, as_cmap=True)
-    # cmap = sns.dark_palette("blue",n_colors=6)
-    # sns.set_palette(sns.color_palette("Paired", as_cmp=True))
-    # cmap=sns.color_palette("Blues")
     cmap = sns.cubehelix_palette (10, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=True)
 
-    ax = sns.scatterplot(data=df2,x="Feeds", y="Tags", size="Number",
+    ax2 = fig.add_subplot(212)
+    ax3 = sns.scatterplot(data=df2,x="Feeds", y="Tags", size="Number", ax=ax2,
                          hue="Number",sizes=(50,400), markers = False, palette=cmap) #"Blues_r"
-    ax.tick_params(labelsize=12)
+    ax2.tick_params(labelsize=12)
+    plt.xticks(rotation=45, horizontalalignment='right')
     plt.title("Tag Usage in RSS Feeds", fontsize=20)
+    fig.subplots_adjust(hspace=5)
+    plt.tight_layout()
     plt.show()
     return
 

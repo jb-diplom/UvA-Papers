@@ -92,12 +92,10 @@ df['pca-three'] = pca_result[:,2] # in this case the second column of the
 #%% Choose colours for seaborn in a notebook
 import seaborn as sns
 sns.choose_cubehelix_palette()
-#%% Visualize data-structures
-from graphviz import *
-from lolviz import *
-data = ['hi','mom',{3,4},{"parrt":"user"}]
-g = listviz(data)
-print(g.source) # if you want to see the graphviz source
-g.view() # render and show graphviz.files.Source object
-
-
+#%% Dictionaries: check if there's a value at key withjout getting a KeyError
+dd={}
+(bool(dd.get('key')))
+Out[64]: False
+dd["key"]=98
+(bool(dd.get('key')))
+Out[66]: True

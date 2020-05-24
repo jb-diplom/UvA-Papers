@@ -15,7 +15,6 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import ipywidgets as widgets
 from IPython import display
-from IPython.core.display import HTML
 from gensim.matutils import softcossim
 import datetime
 import time
@@ -31,6 +30,9 @@ from bokeh.io import  show, output_notebook, output_file
 
 import matplotlib.pyplot as plt
 import plotly.express as px
+from sklearn.cluster import SpectralClustering
+from sklearn.decomposition import PCA
+from mpl_toolkits.mplot3d import Axes3D
 
 import warnings
 # Suppress annoying deprecation messages which I'm not going to fix yet
@@ -83,21 +85,6 @@ def loadWordEmbeddings(modelName="w2v_model"):
     else:
         print (modelName, "is unknown")
     return
-
-#%% renderTable
-def renderTable(df1):
-        # create output widgets
-    widget1 = widgets.Output()
-    
-    # render in output widgets
-    with widget1:
-        display.display(df1)
-    
-    # create HBox
-    hbox = widgets.HBox([widget1])
-    
-    # render hbox
-    hbox
 
 #%% getWordEmbeddingModel TODO try out other word embedding (fasttext_model300)
 def getWordEmbeddingModel():
@@ -246,15 +233,13 @@ def calculateXYZByPCAMethod(df, clusterNumber=20, threshold=0.5):
             inplace=True)
     new_df=df2.applymap(lambda x: 0 if pd.isnull(x) else x) # replace nans with 0
 
-    from sklearn.cluster import SpectralClustering
     sc=SpectralClustering(clusterNumber).fit_predict(new_df)
 
     # determine largest topicality per entry for size of ball in scatterplot
     sizes=[]
     for flt_size in new_df.max(axis=1):
-        sizes.append(math.ceil((flt_size-(threshold*0.9))*80))
+        sizes.append(math.ceil((flt_size-(threshold*0.95))*70))
 
-    from sklearn.decomposition import PCA
     pca = PCA(n_components=3)
     pca_result = pca.fit_transform(new_df)
 
@@ -274,7 +259,6 @@ def calculateXYZByPCAMethod(df, clusterNumber=20, threshold=0.5):
 
 def show3D(df, title=""):
 
-    from mpl_toolkits.mplot3d import Axes3D
     ax = plt.figure(figsize=(16,10)).gca(projection='3d')
     ax.scatter(
         xs=df.loc[:]["pca-one"],
@@ -300,12 +284,19 @@ def plotScatter3D(df, title, allDict, notebook=True):
     import plotly
     import plotly.graph_objs as go
     statTooltips=[]
+    doctopics=[]
+    docdates=[]
     for key in df.index:
         try:
             statTooltips.append(tooltipText(allDict[key]))
         except:
             print (key, "not found")
 
+    colorDropdown = widgets.Dropdown(
+        description='Topics:',
+        value=df["specGroup"][0],
+        options=df["specGroup"]
+    )
     trace = go.Scatter3d(
         x=df['pca-one'],
         y=df['pca-two'],
@@ -319,9 +310,20 @@ def plotScatter3D(df, title, allDict, notebook=True):
             showscale=True,
             opacity=0.6
         ),
+        # symbol=df["specGroup"],
         text=statTooltips,
-        hoverinfo='text',
+        textfont=dict(family="sans serif",size=8,color='crimson'),
+        hoverinfo='text'
     )
+
+    def response(change):
+        with fig.batch_update():
+            fig.data[0].x=xs
+            fig.data[0].y=np.sin(aSlider.value*xs-bSlider.value)
+            fig.data[0].line.color=colorDropdown.value
+            fig.layout.xaxis.title = 'whatever'
+
+
     # Configure the layout.
     layout = go.Layout(margin={'l': 0, 'r': 0, 'b': 0, 't': 0})
     
@@ -355,6 +357,8 @@ def tooltipText(rssEntry):
         DESCRIPTION.
 
     """
+    maxlen=40
+
     src = rssEntry["feed_name"]
     auth = getAuthorFromRssEntry(rssEntry)
     if hasattr(rssEntry , "updated"):
@@ -362,6 +366,8 @@ def tooltipText(rssEntry):
     else:
         dt=parse(rssEntry.published, ignoretz=True)
     title = rssEntry.title
+    if len(title) > maxlen:
+        title = title[:maxlen] + "..."
 
     datestr=dt.strftime("%d/%m/%Y, %H:%M:%S")
     items=[]
@@ -412,10 +418,10 @@ def getAuthorFromRssEntry(val):
     for ix, auth in enumerate(authors):
         if ' and ' in auth:
             authors.extend(auth.split (" and "))
-     # for auth in authors:
-     #     if (len(auth))
-
-    return " ".join(authors)
+    ret = " ".join(authors)
+    if len(ret)==0:
+        ret="n/a"
+    return ret
 
 #%% preparePyLDAvisData
 #   https://www.machinelearningplus.com/nlp/cosine-similarity/
@@ -467,12 +473,14 @@ def showPyLDAvis(allDict, notebook=True, numTopics=30):
     # TODO: see if we can get ngrams into pyLDAvis
     if not notebook:
         output_file("pyDAVis.html")
-    else:
-        pyLDAvis.enable_notebook()
+
     dataTuple=preparePyLDAvisData(allDict, limit=None, numTopics=numTopics)
     data = pyLDAvis.gensim.prepare(dataTuple[0],dataTuple[1],dataTuple[2])
     if notebook:
-        p=pyLDAvis.display(data)
+        output_notebook()
+        pyLDAvis.enable_notebook(True)
+        p=pyLDAvis.display(data, template_type='general')
+        display.display(p)
     else:
         p=pyLDAvis.show(data) # displays in own window combined with output_file
         show(p)
@@ -505,7 +513,7 @@ def test3DPlotOfCosineSimilarity(allDict, num=None, matrix=None,
     if not matrix is not None :
         matrix=deriveSoftCosineSimilarityMatrix(allDict, num)
     matout=calculateXYZByPCAMethod(matrix,numTopics,threshold)
-    plotScatter3D(matout,"10 Groups, threshold 0.69", allDict,notebook=notebook)
+    plotScatter3D(matout,str(numTopics)+" Groups, threshold "+str(threshold), allDict,notebook=notebook)
 
     # can also do a simple perspective plot with matplot
     # show3D(matout)

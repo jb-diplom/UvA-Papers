@@ -296,7 +296,7 @@ def displayTopicsAndFeeds(allItemDict, numTopics=30):
     sns.set()
     # plt.xticks(rotation=60)
     # plt.figure(figsize=(50,100))
-    sns.set(rc={'figure.figsize':(13,13)})
+    sns.set(rc={'figure.figsize':(14,13)})
 
     plt.xticks(rotation=45, horizontalalignment='right')
     feedTuple=getAllFeedTopics(allItemDict)
@@ -452,6 +452,11 @@ def getAllTopics(allDocDict):
     print("="*90, "\nThese are the 20 most frequent topics used:\n","="*90,"\n",c_topics.most_common(20))
 
     return topics
+#%% Sentiment Analysis
+def sentimentAnanylsis():
+    import nltk
+    nltk.download('vader_lexicon')
+    return
 
 #%% smallDict utility
 def smallDict(d, sample=10):
