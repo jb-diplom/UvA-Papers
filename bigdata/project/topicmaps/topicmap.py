@@ -290,13 +290,34 @@ def updateDictionaryByFuzzyRelevanceofTopics(topic_list, allEntryDict, limit = N
                 print ("removal of", key, "not possible")
 
     return toBeRemoved
+#%% simpleTopicDisplay Histogram
+def simpleTopicDisplay(ax,topnames,topNumbers):
+
+    topList = pd.DataFrame({"Topics": topnames,
+                        "Frequency":topNumbers
+                         })
+    topList = topList.sort_values('Frequency',ascending=True).reset_index()
+    
+    # Plot the total crashes
+    # sns.set_color_codes("pastel")
+    cmap = sns.cubehelix_palette (40, dark = .3, light=.8,start=0.9,
+                                  rot=-1.0,gamma=0.8, as_cmap=False)
+    sns.barplot(y="Topics", x="Frequency", data=tagList,
+                label="Tags", palette=cmap)
+
+    # Add a legend and informative axis label
+    ax.legend(ncol=2, loc="lower right", frameon=True)
+    ax.set(xlim=(0, max(topNumbers)+5), xlabel="",
+            ylabel="Topics designated to articles")
+    plt.title("Topic Frequency Overall", fontsize=20)
+    return
 
 #%% displayTopicsAndFeeds
 def displayTopicsAndFeeds(allItemDict, numTopics=30):
     sns.set()
     # plt.xticks(rotation=60)
     # plt.figure(figsize=(50,100))
-    sns.set(rc={'figure.figsize':(14,13)})
+    sns.set(rc={'figure.figsize':(14,5+numTopics*0.35)})
 
     plt.xticks(rotation=45, horizontalalignment='right')
     feedTuple=getAllFeedTopics(allItemDict)
@@ -321,6 +342,51 @@ def displayTopicsAndFeeds(allItemDict, numTopics=30):
     ax = sns.scatterplot(data=df2,x="Feeds", y="Topics", size="Number", 
                          hue="Number",sizes=(100,300), markers = False, palette=cmap)
     ax.tick_params(labelsize=12)
+    plt.title("Topic Usage in RSS Feeds", fontsize=20)
+    plt.tight_layout()
+    plt.show()
+    return
+
+#%% displayTopicsAndFeeds
+def displayTopicsAndFeeds2(allItemDict, numTopics=30):
+    sns.set()
+    # plt.xticks(rotation=60)
+    # plt.figure(figsize=(50,100))
+    sns.set(rc={'figure.figsize':(14,5+numTopics*0.75)})
+
+    plt.xticks(rotation=45, horizontalalignment='right')
+    feedTuple=getAllFeedTopics(allItemDict)
+    
+    feeds=[]
+    allTopics=getAllTopics(allItemDict)
+    c_Topics=Counter(allTopics)
+    topnames=[item[0] for item in c_Topics]
+    topNumbers=[item[1] for item in c_Topics]
+
+    allTopics=getAllTopics(allItemDict)
+    c_Topics=Counter(allTopics)
+    topN=c_Topics.most_common(numTopics)
+    Topicnames=[item[0] for item in topN]
+    for feed,nrTopics in feedTuple[0].items():
+        feeds.append(feed)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(211)
+    widg1=simpleTopicDisplay(ax,topnames,topNumbers)
+
+    matr=np.zeros( (len(feeds),len(Topicnames) ) )
+    df = pd.DataFrame(data= matr, columns=Topicnames, index=feeds)
+    populateTopicMatrix(allItemDict, df)
+    df2=makeTopicMatrix(df)
+    sns.set_context("paper", font_scale=1.0)
+    # sns.set_style("whitegrid", {'axes.grid' : False})
+    # cmap = sns.cubehelix_palette (dark = .3, light=.8, as_cmap=True)
+    cmap = sns.cubehelix_palette (10, dark = .3, light=.8,start=0.9, rot=-1.0,gamma=0.8, as_cmap=True)
+
+    ax2 = fig.add_subplot(212)
+    ax = sns.scatterplot(data=df2,x="Feeds", y="Topics", size="Number", ax=ax2,
+                         hue="Number",sizes=(100,300), markers = False, palette=cmap)
+    ax2.tick_params(labelsize=12)
     plt.title("Topic Usage in RSS Feeds", fontsize=20)
     plt.tight_layout()
     plt.show()
@@ -447,9 +513,9 @@ def getAllTopics(allDocDict):
         else:
             nwithout +=1
             
-    print("="*90,  "\nThere were", nwith, "items with topics and", nwithout, "without topics")
+    print("\nThere were", nwith, "items with topics and", nwithout, "without topics")
     c_topics=Counter(topics)
-    print("="*90, "\nThese are the 20 most frequent topics used:\n","="*90,"\n",c_topics.most_common(20))
+    # print("="*90, "\nThese are the 20 most frequent topics used:\n","="*90,"\n",c_topics.most_common(20))
 
     return topics
 #%% Sentiment Analysis
