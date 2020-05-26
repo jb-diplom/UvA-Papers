@@ -13,7 +13,8 @@ import ipywidgets as widgets
 from IPython import display
 import pandas as pd
 import seaborn as sns; sns.set()
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt, mpld3
+
 import datetime
 from dateutil.parser import parse
 from bs4 import BeautifulSoup
@@ -309,8 +310,10 @@ def summarizeByDate(dict1):
     sns.set(rc={'figure.figsize':(14,17)})
 
     for uid, val  in tqdm(dict1.items(), desc="Summarizing by date"):
-        articleDate.append(getRssArticleDate(val))
-        feedNames.append(val.feed_name)
+        aDate=getRssArticleDate(val)
+        if aDate!=None:
+            articleDate.append(aDate)
+            feedNames.append(val.feed_name)
 # TODO add actual content etc for tooltip (in val.collatedContents)
 # TODO add tags and/or topics to use instead of feedname in swarmplot
         articleSize.append(getRssArticleSize(val))
@@ -326,7 +329,6 @@ def summarizeByDate(dict1):
     plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', fontsize= "16",ncol=1)
 
     #Tooltips
-    import matplotlib.pyplot as plt, mpld3
     fig = plt.gcf()
     tooltip = mpld3.plugins.PointLabelTooltip(fig, labels=list(outDict["labels"]))
     mpld3.plugins.connect(fig, tooltip)
@@ -342,16 +344,16 @@ def summarizeByDate(dict1):
     return
 #%%
 def appendRssArticleDateAndSize(rssentry):
-    if not (bool(rssentry["articleDate"])):
+    if not (bool(rssentry.get("articleDate"))):
         if hasattr(rssentry , "published"):
             dt=parse(rssentry.published, ignoretz=True)
         else:
             dt=parse(rssentry.updated, ignoretz=True)
         
-        dt=dt.strftime('%d, %m %Y')
+        dt=dt.strftime('%d %m %Y')
         rssentry["articleDate"]=dt
 
-    if not (bool(rssentry["articleSize"])):
+    if not (bool(rssentry.get("articleSize"))):
         rssentry["articleSize"]=len(rssentry.collatedContents.split())
     return
 

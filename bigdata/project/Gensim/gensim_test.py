@@ -14,7 +14,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import ipywidgets as widgets
-from IPython import display
+from IPython.display import display
 from gensim.matutils import softcossim
 import datetime
 import time
@@ -157,15 +157,6 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
     # pyDAVis param "d"
     dictionary = corpora.Dictionary([simple_preprocess(doc) for doc in documents])
 
-    # Prepare the similarity matrix
-    # TODO Check if some of these parameters can be used to begin with rather than filtering later
-    # TODO Shouldn't the tf_idf from below be put into this call?
-    similarity_matrix = model.similarity_matrix(    dictionary, 
-                                                    tfidf=None, 
-                                                    threshold=0.0, 
-                                                    exponent=2.0, 
-                                                    nonzero_limit=100)
-    
     # Convert the sentences into bag-of-words vectors.
     sentences=[]     # pyDAVis param "c"
     for doc in documents:
@@ -177,6 +168,16 @@ def deriveSoftCosineSimilarityMatrix(allDict, limit=None):
     # pyDAVis param "lda"
     tf_idf = models.TfidfModel(sentences)
 
+
+    # Prepare the similarity matrix
+    # TODO Check if some of these parameters can be used to begin with rather than filtering later
+    # TODO Shouldn't the tf_idf from below be put into this call?
+    similarity_matrix = model.similarity_matrix(    dictionary, 
+                                                    tfidf=tf_idf,
+                                                    threshold=0.3,
+                                                    exponent=2.0, 
+                                                    nonzero_limit=100)
+    
     # create 1xN vector filled with 1,2,..N
     len_array = np.arange(len(sentences)) 
     # create NxN array filled with 1..N down, 1..N across
@@ -471,19 +472,30 @@ def preparePyLDAvisData(allDict, limit=None, numTopics=30):
 
 def showPyLDAvis(allDict, notebook=True, numTopics=30):
     # TODO: see if we can get ngrams into pyLDAvis
-    if not notebook:
-        output_file("pyDAVis.html")
 
     dataTuple=preparePyLDAvisData(allDict, limit=None, numTopics=numTopics)
     data = pyLDAvis.gensim.prepare(dataTuple[0],dataTuple[1],dataTuple[2])
-    if notebook:
+    if notebook==True:
         output_notebook()
         pyLDAvis.enable_notebook(True)
         p=pyLDAvis.display(data, template_type='general')
-        display.display(p)
+        display(p)
     else:
+        output_file("pyDAVis.html")
         p=pyLDAvis.show(data) # displays in own window combined with output_file
         show(p)
+    return
+
+#%% showPyLDAvisNB
+def showPyLDAvisNB(allDict, numTopics=30):
+    # TODO: see if we can get ngrams into pyLDAvis
+
+    dataTuple=preparePyLDAvisData(allDict, limit=None, numTopics=numTopics)
+    data = pyLDAvis.gensim.prepare(dataTuple[0],dataTuple[1],dataTuple[2])
+    output_notebook()
+    pyLDAvis.enable_notebook(True)
+    p=pyLDAvis.display(data, template_type='general')
+    display(p)
     return
 
 #%% format_vertical_headers
