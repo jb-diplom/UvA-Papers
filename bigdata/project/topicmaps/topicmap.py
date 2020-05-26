@@ -576,7 +576,7 @@ def jointPlotOfSentiment(topic,dict0, sentitype="Positive"):
                   hue_order=["Positive", "Negative", "Neutral", "Overall"])
     g = (g.map(plt.heatmap, "Source", "Sentiment Value", **kws).add_legend())
     return
-
+ 
 def heatmapOfSentiment(topic,dict0, sentitype="Positive"):
     df=getSentimentsForTopic(topic,dict0)
     #make a correlation matrix and display in heatmap
