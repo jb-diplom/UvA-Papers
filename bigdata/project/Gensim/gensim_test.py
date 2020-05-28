@@ -272,16 +272,13 @@ def show3D(df, title=""):
     ax.set_ylabel('pca-two')
     ax.set_zlabel('pca-three')
 
-    # hover=plt.select(dict(type=HoverTool))
-    # ax.legend.click_policy="hide"
-    # hover.tooltips={"id": "@index", "publication": "@pca-one", "content":"@pca-two", "category":"@specGroup"}
     plt.title(title, fontsize=20)
     plt.tight_layout()
 
     plt.show()
     return
 
-def plotScatter3D(df, title, allDict, notebook=True):
+def plotScatter3D(df, mytitle, allDict, notebook=True):
     import plotly
     import plotly.graph_objs as go
     statTooltips=[]
@@ -307,6 +304,7 @@ def plotScatter3D(df, title, allDict, notebook=True):
             size=df["size"],
             color=df["specGroup"],
             colorscale='Viridis',
+            colorbar = dict(title= "Topic<br>Relevance"),
             # symbol=df["specGroup"], # TODO actually want Feedname
             showscale=True,
             opacity=0.6
@@ -317,22 +315,22 @@ def plotScatter3D(df, title, allDict, notebook=True):
         hoverinfo='text'
     )
 
-    def response(change):
-        with fig.batch_update():
-            fig.data[0].x=xs
-            fig.data[0].y=np.sin(aSlider.value*xs-bSlider.value)
-            fig.data[0].line.color=colorDropdown.value
-            fig.layout.xaxis.title = 'whatever'
-
-
     # Configure the layout.
-    layout = go.Layout(margin={'l': 0, 'r': 0, 'b': 0, 't': 0})
-    
+#    layout = go.Layout(margin={'l': 0, 'r': 0, 'b': 0, 't': 0})
+    layout = go.Layout(showlegend=False,
+                       title=mytitle,
+                       margin={'l': 0, 'r': 0, 'b': 50, 't': 30},
+                       scene=go.Scene(
+                           xaxis=go.XAxis(title='PCA Dimension<br>Reduced X'),
+                           yaxis=go.YAxis(title='PCA Dimension<br>Reduced Y'),
+                           zaxis=go.ZAxis(title='PCA Dimension<br>Reduced Z')))
+
+
     data = [trace]
     plot_figure = go.Figure(data=data, layout=layout)
-    # plot_figure.update_layout(title:title)
-    # plt.title(title, fontsize=16)
-    # plt.tight_layout()
+    camera = dict( eye=dict(x=1.5, y=1.5, z=0.1))
+    plot_figure.update_layout(scene_camera=camera)
+#    plt.tight_layout()
 
     # Render the plot.
     pl=plotly.offline.iplot(plot_figure)
@@ -447,24 +445,12 @@ def preparePyLDAvisData(allDict, limit=None, numTopics=30):
                                                     threshold=0.0, 
                                                     exponent=2.0, 
                                                     nonzero_limit=100)
-    
     # Convert the sentences into bag-of-words vectors.
     sentences=[]     # pyDAVis param "c"
     for doc in documents:
         sentences.append(dictionary.doc2bow(simple_preprocess(doc)))
 
     ldamodel = models.ldamodel.LdaModel(sentences, num_topics=numTopics, id2word = dictionary, passes=50)
-
-    # # create 1xN vector filled with 1,2,..N
-    # len_array = np.arange(len(sentences)) 
-    # # create NxN array filled with 1..N down, 1..N across
-    # xx, yy = np.meshgrid(len_array, len_array)
-    # # Iterate over the 2d matrix calculating
-    # theMatrix=[[round(softcossim(sentences[i],sentences[j], similarity_matrix) ,2) 
-    #             for i, j in zip(x,y)] 
-    #             for y, x in zip(xx, yy)]
-    
-    # cossim_mat = pd.DataFrame(theMatrix, index=ids, columns=ids)
 
     return (ldamodel, sentences, dictionary)
 
@@ -495,6 +481,8 @@ def showPyLDAvisNB(allDict, numTopics=30):
     output_notebook()
     pyLDAvis.enable_notebook(True)
     p=pyLDAvis.display(data, template_type='general')
+    plt.tight_layout()
+
     display(p)
     return
 
@@ -525,15 +513,16 @@ def test3DPlotOfCosineSimilarity(allDict, num=None, matrix=None,
     if not matrix is not None :
         matrix=deriveSoftCosineSimilarityMatrix(allDict, num)
     matout=calculateXYZByPCAMethod(matrix,numTopics,threshold)
-    plotScatter3D(matout,str(numTopics)+" Groups, threshold "+str(threshold), allDict,notebook=notebook)
+    titleStr= "<b>Clustering of " + str(numTopics) + " Groups, Threshold "+ str(threshold)
+    p=plotScatter3D(matout,titleStr,allDict,notebook=notebook)
 
-    # can also do a simple perspective plot with matplot
+    # can also do a simple perspective plot using matplot
     # show3D(matout)
 
     # In case you need to clean up a previously used and abused matrix ..
     # newmatr=newmatr_svae.drop(columns=['pca-one', 'pca-two','pca-three','specGroup'])
-
     return
+
 #%% Test method for displaying 3d plot with topic
 def testCase():
     """

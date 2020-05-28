@@ -51,9 +51,9 @@ import plotly.graph_objs as go
 
 # Configure the trace.
 trace = go.Scatter3d(
-    x=[1, 2, 3],  # <-- Put your data instead
-    y=[4, 5, 6],  # <-- Put your data instead
-    z=[7, 8, 9],  # <-- Put your data instead
+    x=[1, 2, 3, 5],  # <-- Put your data instead
+    y=[4, 5, 6, 6],  # <-- Put your data instead
+    z=[7, 8, 9, 8],  # <-- Put your data instead
     mode='markers',
     marker={
         'size': 10,

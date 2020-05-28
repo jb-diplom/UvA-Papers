@@ -5,16 +5,15 @@ Created on Wed May  6 21:31:08 2020
 @author: Janice
 """
 import seaborn as sns; sns.set()
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from collections import Counter, defaultdict 
+import matplotlib.pyplot as plt
 
-import importlib
 # importlib.import_module("rssreader.reader")
-importlib.import_module("reader")
+import reader
 from reader import loadAllFeedsFromFile,getStringContents, getAllTags
-importlib.import_module("topicmap")
+import topicmap
 from topicmap import getDocList, smallDict, getAllTopics, deriveTopicMaps,updateDictionaryByFuzzyRelevanceofTopics, getCustomStopWords
 import seaborn as sns
 sns.set()
@@ -105,17 +104,18 @@ def simpleTagDisplay(ax,tagnames,tagNumbers):
     return
 
 #%% displayAuthors
-def displayAuthors(theAuthors=None, dict=None):
+def displayAuthors(theAuthors=None, dict=None,displayAmount=30):
     sns.set(style="whitegrid")
 
     if not theAuthors:
         theAuthors=getAuthors(dict)
 
     # Initialize the matplotlib figure
-    authorfig, ax = plt.subplots(figsize=(16,20))
+    authorfig, ax = plt.subplots(figsize=(14,5+displayAmount*0.3))
+
     plt.subplots_adjust()
     frequen2 = Counter (theAuthors)
-    authFrq=frequen2.most_common(30)
+    authFrq=frequen2.most_common(displayAmount)
     frequen=[n[1] for n in authFrq]
     auth=[n[0] for n in authFrq]
     
@@ -134,7 +134,7 @@ def displayAuthors(theAuthors=None, dict=None):
     # Add a legend and informative axis label
     ax.legend(ncol=2, loc="lower right", frameon=True)
     ax.set(xlim=(0, max(frequen)+5), xlabel="",
-            ylabel="Authors of all articles")
+            ylabel="Authors all articles (the "+ str(displayAmount) + " most frequent)")
     plt.yticks(rotation=0, horizontalalignment='right')
     pltout=sns.despine(left=True, bottom=True)
     return pltout
@@ -223,7 +223,7 @@ def makeTagMatrix(df):
 def displayTags(allItemDict, displayAmount=30):
 
     sns.set(style="whitegrid")
-    sns.set(rc={'figure.figsize':(14,5+displayAmount*0.75)})
+    sns.set(rc={'figure.figsize':(14,5+displayAmount*0.7)})
 
     feedTuple=getAllFeedtags(allItemDict)
     

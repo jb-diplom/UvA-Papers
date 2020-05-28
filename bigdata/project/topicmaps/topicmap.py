@@ -50,7 +50,6 @@ from tqdm.notebook import trange, tqdm
 # For data-structure visualization
 # conda install python-graphviz
 # pip install lolviz
-import seaborn as sns
 
 # Source: https://www.kaggle.com/arthurtok/spooky-nlp-and-topic-modelling-tutorial#3.-Topic-modelling
 
@@ -290,7 +289,8 @@ def updateDictionaryByFuzzyRelevanceofTopics(topic_list, allEntryDict, limit = N
             try:
                 allEntryDict.pop(gone)
             except:
-                print ("removal of", key, "not possible")
+                continue
+                # print ("removal of", key, "not possible")
 
     return toBeRemoved
 #%% simpleTopicDisplay Histogram
@@ -521,7 +521,89 @@ def getAllTopics(allDocDict):
     # print("="*90, "\nThese are the 20 most frequent topics used:\n","="*90,"\n",c_topics.most_common(20))
 
     return topics
+#%% Sentiment Analysis
+def conductSentimentAnalysis(allDict):
+    import nltk
+    from nltk.sentiment import vader
+    nltk.download('vader_lexicon')
+    senti=vader.SentimentIntensityAnalyzer()
 
+    for val in tqdm(list(allDict.values()), desc="Analyze Sentiment"):
+        val["sentiment"]=senti.polarity_scores(val["collatedContents"])
+    return
+#%% getSentimentsForTopic
+def getSentimentsForTopic(topic, dict):
+    feeds=[]
+    dates=[]
+    types=[]
+    value=[]
+    id=[]
+    for val in tqdm(dict.values(), desc = "Fetching Sentiments for '" + topic + "'"):
+        # try:
+        if topic in [item[0] for item in val.topiclist]:
+            for typ in [("Positive","pos"),("Negative","neg"),("Neutral","neu"),("Overall","compound")]:
+                feeds.append(val.get("feed_name"))
+                dates.append(getRssArticleDate(val))
+                types.append(typ[0])
+                value.append(val.get("sentiment").get(typ[1]))
+                id.append(val.get("id"))
+        # except:
+        #     continue
+    df = pd.DataFrame({"Source": feeds,
+                       "Published":dates,
+                       "Sentiment Type":types,
+                       "Sentiment Value":value,
+                       "UID":id,
+                         })
+    return df
+
+# def normalizeSentiValue(val):
+#     return int(math.ceil(val*100))
+#%%
+def jointPlotOfSentiment(topic,dict0, sentitype="Positive"):
+    df=getSentimentsForTopic(topic,dict0)
+    sns.set(style="white", color_codes=True)
+    # g = sns.jointplot(x="Source", y="Published", data=df)
+    # plt.xticks(rotation=45, horizontalalignment='right')
+    # .set_axis_labels("Source", "Published") #, scatter = False)
+    # g.ax_joint.cla()
+    # plt.sca(g.ax_joint)
+    # plt.scatter(x="Source", y="Published", data=df,c=sentitype)
+
+    # g = sns.FacetGrid(data=df, row="Source",col="Sentiment Type", hue="Positive")
+    kws = dict(s=50, linewidth=.5, edgecolor="w")
+    pal = dict(Negative="red", Positive="green", Neutral="yellow", Overall="blue")
+    g = sns.FacetGrid(df, col="Sentiment Type", hue="Sentiment Type", palette=pal,
+                  hue_order=["Positive", "Negative", "Neutral", "Overall"])
+    g = (g.map(plt.heatmap, "Source", "Sentiment Value", **kws).add_legend())
+    return
+
+def heatmapOfSentiment(topic,dict0, sentitype="Positive"):
+    df=getSentimentsForTopic(topic,dict0)
+    #make a correlation matrix and display in heatmap
+    # probably use DataFrame multiindex technique to extract the necessary
+    correl=pd.DataFrame({"Source":set(df["Source"])})
+    for feed in set(df["Source"]):
+        vals=[]
+        for day in set(df["Published"]):
+            vals.append(df[feed,day][sentitype])
+        correl[day]=vals
+
+
+    df.plot(x='Source', y='Published', col='Sentiment Value')
+    # [axis.set_aspect('equal') for axis in g.axes.ravel()]
+    return
+
+def testJointPlot(allDict, size=100):
+    sm=smallDict(allDict,size)
+    conductSentimentAnalysis(sm)
+    docl=getDocList(sm, reloaddocs=False,stop_list=getCustomStopWords())
+    topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,3))
+    updateDictionaryByFuzzyRelevanceofTopics(topics,sm, limit=None, threshold=20, remove=True)
+    tlist=[item[0] for item in topics]
+    # getSentimentsForTopic(tlist[0],sm)
+    jointPlotOfSentiment(tlist[0],sm, "Positive")
+    return
 
 #%% smallDict utility
 def smallDict(d, sample=10):
@@ -557,6 +639,13 @@ def testDisplayTopicsAndFeeds(numArticles=300, dict=None, numTopics=30,
     topics= deriveTopicMaps(docl, maxNum=numTopics, ngram_range=ngram_range)
     updateDictionaryByFuzzyRelevanceofTopics(topics,dict) # populates topiclist in dict entries
     displayTopicsAndFeeds(dict)
+    return
+
+#%%
+def topicChooser(topics):
+    widgets.Dropdown(options=topics,
+                     description='Topics:',
+                     disabled=False)
     return
 
 #%% Test Code for Topic Maps and Fuzzy

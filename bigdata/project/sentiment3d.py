@@ -4,15 +4,28 @@ Created on Tue May 26 18:10:08 2020
 
 @author: Janice
 """
-from reader import loadAllFeedsFromFile,getStringContents
-from topicmap import *
-from Gensim.gensim_test import *
+from reader import loadAllFeedsFromFile,getStringContents,getRssArticleDate
+from topicmap import (unzipLeftSide,smallDict,getDocList,
+                      deriveTopicMaps,updateDictionaryByFuzzyRelevanceofTopics)
+from Gensim.gensim_test import getAuthorFromRssEntry,getCustomStopWords
+
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+from ipywidgets import Layout, Button, Box, VBox, HBox
+
 import nltk
 from nltk.sentiment import vader
+import matplotlib.pyplot as plt
+import pandas as pd
+from dateutil.parser import *
 
 import plotly
 import plotly.graph_objs as go
 from tqdm.notebook import trange, tqdm
+
+import warnings
+warnings.filterwarnings("ignore")
+
 
 #%% Sentiment Analysis
 def conductSentimentAnalysis(allDict):
@@ -62,9 +75,55 @@ def getSentimentsForTopic3(topic, dict):
                          })
     return df
 
+#%% getSentimentsForTopic
+def getTopicIdDict(dict):
+    # Make a dictionary mapping topics to RSSEntry-Ids
+    topicIdDict={}
+    for key,val in tqdm(dict.items(), desc = "Mapping Topics"):
+        try:
+            if hasattr(val,"topiclist"):
+                for tup in val.topiclist:
+                    if not bool(topicIdDict.get(tup[0])):
+                        topicIdDict[tup[0]]=[]
+                    topicIdDict[tup[0]].append(key)
+        except:
+            continue
+    return topicIdDict
 
+#%%
+def headerSentiText(rssEntry):
+    maxlen=40
 
+    src = rssEntry["feed_name"]
+    posSent = rssEntry["sentiment"]["pos"]
+    negSent = rssEntry["sentiment"]["neg"]
+    neuSent = rssEntry["sentiment"]["neu"]
+    compSent = rssEntry["sentiment"]["compound"]
+    auth = getAuthorFromRssEntry(rssEntry)
+    if hasattr(rssEntry , "updated"):
+        dt=parse(rssEntry.updated, ignoretz=True)
+    else:
+        dt=parse(rssEntry.published, ignoretz=True)
+    title = rssEntry.title
+    if len(title) > maxlen:
+        title = title[:maxlen] + "..."
 
+    datestr=dt.strftime("%d/%m/%Y, %H:%M:%S")
+    items=[]
+    items.append(f"Title:           {title : <10}")
+    items.append(f"Feed:          {src: <10}")
+    items.append(f"Published:  {datestr: <10}")
+    items.append(f"Sentiment:  " +
+                 f"pos: {posSent : <8}"+
+                 f"neg: {negSent : <8}"+
+                 f"neut: {neuSent : <8}"+
+                 f"comp: {compSent : <8}")
+
+    str=""
+    for token in items:
+        str=str+(token)+("\n")
+
+    return str
 #%% tooltipText
 def tooltipSentiText(rssEntry):
     """
@@ -103,7 +162,7 @@ def tooltipSentiText(rssEntry):
     items.append(f"Title:           {title : <10}")
     items.append(f"Feed:         {src: <10}")
     items.append(f"Published: {datestr: <10}")
-    items.append(f"Sentiment: <br>" +
+    items.append(f"<b>Sentiment: <br>" +
                  f"pos: {posSent : <8}"+
                  f"neg: {negSent : <8}"+
                  f"neut: {neuSent : <8}"+
@@ -124,11 +183,6 @@ def plotSentiment3D(df2, allDict, notebook=True, topic=""):
         except:
             print (key, "not found")
 
-    # colorDropdown = widgets.Dropdown(
-    #     description='Topics',
-    #     value=df["specGroup"][0],
-    #     options=df["specGroup"]
-    # )
     trace = go.Scatter3d(
         x=df2['Positive'],
         y=df2['Negative'],
@@ -138,7 +192,7 @@ def plotSentiment3D(df2, allDict, notebook=True, topic=""):
             size=df2["Topicality"],
             color=df2['Overall'],
             colorscale='Inferno',
-            colorbar = dict(title= "Compound Sentiment"),
+            colorbar = dict(title= "Compound<br>Sentiment"),
             # symbol=df["specGroup"], # TODO actually want Feedname
             showscale=True,
             opacity=0.7,
@@ -150,90 +204,118 @@ def plotSentiment3D(df2, allDict, notebook=True, topic=""):
     )
     # Configure the layout.
     layout = go.Layout(showlegend=False,
-                       title="Sentiment Analysis for Topic '"+ topic +"'",
+                       title="<b>Sentiment Analysis for Topic '"+ topic +"'",
+                       margin={'l': 0, 'r': 0, 'b': 50, 't': 30},
                        scene=go.Scene(
-                           xaxis=go.XAxis(title='Positive Sentiment'),
-                           yaxis=go.YAxis(title='Negative Sentiment'),
-                           zaxis=go.ZAxis(title='Neutral Sentiment')))
+                           xaxis=go.XAxis(title='Positive<br>Sentiment'),
+                           yaxis=go.YAxis(title='Negative<br>Sentiment'),
+                           zaxis=go.ZAxis(title='Neutral<br>Sentiment')))
     data = [trace]
     plot_figure = go.Figure(data=data, layout=layout)
+    camera = dict( eye=dict(x=1.5, y=1.5, z=0.1))
+    plot_figure.update_layout(scene_camera=camera)
 
-    #plt.title(title, fontsize=16)
     #plt.tight_layout()
     go.FigureWidget(data=data, layout=layout)
    
     pl=plotly.offline.iplot(plot_figure)
     pl
-    plotly.offline.plot(plot_figure, filename='file.html')
+    if not notebook:
+        plotly.offline.plot(plot_figure, filename='file.html')
     return
 
-#%%
-# def jointPlotOfSentiment(topic,dict0, sentitype="Positive"):
-#     df=getSentimentsForTopic(topic,dict0)
-#     sns.set(style="white", color_codes=True)
-#     # g = sns.jointplot(x="Source", y="Published", data=df)
-#     # plt.xticks(rotation=45, horizontalalignment='right')
-#     # .set_axis_labels("Source", "Published") #, scatter = False)
-#     # g.ax_joint.cla()
-#     # plt.sca(g.ax_joint)
-#     # plt.scatter(x="Source", y="Published", data=df,c=sentitype)
+#%% contentsViewer
+def contentsViewer(allDict, topics):
 
-#     # g = sns.FacetGrid(data=df, row="Source",col="Sentiment Type", hue="Positive")
-#     kws = dict(s=50, linewidth=.5, edgecolor="w")
-#     pal = dict(Negative="red", Positive="green", Neutral="yellow", Overall="blue")
-#     g = sns.FacetGrid(df, col="Sentiment Type", hue="Sentiment Type", palette=pal,
-#                   hue_order=["Positive", "Negative", "Neutral", "Overall"])
-#     g = (g.map(plt.heatmap, "Source", "Sentiment Value", **kws).add_legend())
-#     return
- 
-# def heatmapOfSentiment(topic,dict0, sentitype="Positive"):
-#     df=getSentimentsForTopic(topic,dict0)
-#     #make a correlation matrix and display in heatmap
-#     # probably use DataFrame multiindex technique to extract the necessary
-#     correl=pd.DataFrame({"Source":set(df["Source"])})
-#     for feed in set(df["Source"]):
-#         vals=[]
-#         for day in set(df["Published"]):
-#             vals.append(df[feed,day][sentitype])
-#         correl[day]=vals
-#         from scipy import stats
+    topicIdMap=getTopicIdDict(allDict)# Initialize one time to map topics to ids
+    intro=widgets.Label(value=r'\(\textbf{Pre-select a topic and choose an article to view its contents}\)' )
+    topicdd=widgets.Dropdown(options=unzipLeftSide(topics),
+                             description='Topics:',
+                             layout=Layout(flex='1 1 auto', width='30%'),
+                             disabled=False)
+    
+    docs=widgets.Dropdown(description='RSS Entries:',
+                          layout=Layout(flex='1 1 auto',width='70%'),
+                          disabled=False)
+    
+    ta=widgets.Textarea(description='Content:',rows=10,
+                        layout=Layout(flex='1 1 100%', width='auto'),
+                        disabled=True)
+    
+    items_auto = [topicdd,docs]
+    items_0 = [ta]
+    box_layout = Layout(display='flex',
+                        flex_flow='row',
+                        align_items='stretch',
+                        width='80%')
+    box_auto = Box(children=items_auto, layout=box_layout)
+    box_0 = Box(children=items_0, layout=box_layout)
+    
+    def updateDoclist(b):
+        docs.options=getNewRSSEntryList(allDict,topicIdMap,topicdd.value)
+    
+    def get_and_plot(b):
+        dispTxt=headerSentiText(allDict[docs.value])+"\n" + allDict[docs.value]["collatedContents"]
+        ta.value=dispTxt
 
-# from scipy import stats
-# def qqplot(x, y, **kwargs):
-#     _, xr = stats.probplot(x, fit=False)
-#     _, yr = stats.probplot(y, fit=False)
-#     sns.scatterplot(xr, yr, **kwargs)
-#     g = sns.FacetGrid(df, col="Sentiment Type", hue="Sentiment Value")
-#     g = (g.map(qqplot, "Source", "Published", **kws)
-#       .add_legend())
+    # Initialize dropdown
+    docs.options=getNewRSSEntryList(allDict,topicIdMap,topicdd.value)
 
-#     df.plot(x='Source', y='Published', col='Sentiment Value')
-#     # [axis.set_aspect('equal') for axis in g.axes.ravel()]
-#     return
+    topicdd.observe(updateDoclist, names='value')
+    docs.observe(get_and_plot, names='value')
+    display(VBox([intro,box_auto, box_0]))
+    updateDoclist(None) # just for initialization
+    get_and_plot(None)  # just for initialization
+    return
 
-# def testJointPlot(allDict, size=100):
-#     sm=smallDict(allDict,size)
-#     conductSentimentAnalysis(sm)
-#     docl=getDocList(sm, reloaddocs=False,stop_list=getCustomStopWords())
-#     topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,3))
-#     updateDictionaryByFuzzyRelevanceofTopics(topics,sm, limit=None, threshold=20, remove=True)
-#     tlist=[item[0] for item in topics]
-#     # getSentimentsForTopic(tlist[0],sm)
-#     jointPlotOfSentiment(tlist[0],sm, "Positive")
-#     return
+def getNewRSSEntryList(allDict, topicIdMap, topic):
+    # return list of Title, Docid tuples
+    vallist=[]
+    for docid in topicIdMap[topic]:
+        vallist.append((allDict[docid]["title"],docid))
+    return vallist
 
+#%% displaySentiment3D
+def displaySentiment3D(allDict, topics, notebook=True):
 
+    conductSentimentAnalysis(allDict)
+    allTopics=unzipLeftSide(topics)
+    intro=widgets.Label(value=r'\(\textbf{Select a topic for the 3d sentiment visualization}\)' )
+    ddTopics=widgets.Dropdown(
+        options=allTopics,
+        description='Topic:',
+        disabled=False)
+    
+    def callSentiViewer(b):
+        clear_output(wait=True)
+        display (ddTopics)
+        df2=getSentimentsForTopic3(ddTopics.value,allDict)
+        plotSentiment3D(df2, allDict, notebook=notebook, topic=ddTopics.value)
 
-#%%
+    ddTopics.observe(callSentiViewer, names='value')
+    display(VBox([intro,ddTopics]))
+    callSentiViewer(None) # init
+    return
+
+#%% runSentiment
 def runSentiment (allDict, sm):
     allDict=loadAllFeedsFromFile()
-    sm=smallDict(allDict,2000)
+    sm=smallDict(allDict,200)
     conductSentimentAnalysis(sm)
     docl=getDocList(sm, reloaddocs=False,stop_list=getCustomStopWords())
     topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,3))
     updateDictionaryByFuzzyRelevanceofTopics(topics,sm, limit=None, threshold=20, remove=True)
-    tlist=[item[0] for item in topics]
-    top=tlist[4]
-    df2=getSentimentsForTopic3(top,sm)
-    plotSentiment3D(df2, sm, notebook=False, topic=top)
+    gt=getTopicIdDict(sm)
+    # tlist=[item[0] for item in topics]
+    # top=tlist[4]
+    # df2=getSentimentsForTopic3(top,sm)
+    # plotSentiment3D(df2, sm, notebook=False, topic=top)
     return
+
+# allDict=loadAllFeedsFromFile()
+# sm=smallDict(allDict,200)
+# conductSentimentAnalysis(sm)
+# docl=getDocList(sm, reloaddocs=False,stop_list=getCustomStopWords())
+# topics= deriveTopicMaps(docl, maxNum=30, ngram_range=(3,3))
+# updateDictionaryByFuzzyRelevanceofTopics(topics,sm, limit=None, threshold=20, remove=True)
+# gt=getTopicIdDict(sm)
